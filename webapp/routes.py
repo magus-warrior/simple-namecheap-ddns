@@ -5,12 +5,17 @@ from __future__ import annotations
 import sqlite3
 from typing import Any
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, render_template, request
 
 from shared_lib.security import CryptoManager
 from webapp.models import Secret, Target, db
 
-bp = Blueprint("webapp", __name__)
+bp = Blueprint("webapp", __name__, template_folder="templates", static_folder="static")
+
+
+@bp.get("/")
+def index() -> str:
+    return render_template("index.html")
 
 
 def _get_crypto() -> CryptoManager:
