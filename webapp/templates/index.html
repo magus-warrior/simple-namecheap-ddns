@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simple Namecheap DDNS Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('webapp.static', filename='css/styles.css') }}" />
+  </head>
+  <body>
+    <div class="background-glow"></div>
+    <header class="hero">
+      <div>
+        <p class="eyebrow">DDNS Control Panel</p>
+        <h1>Simple Namecheap Dashboard</h1>
+        <p class="subtitle">
+          Monitor secrets, targets, and recent update logs in a neon-charged command
+          center.
+        </p>
+      </div>
+      <div class="status-pill" id="status-pill">Loading data…</div>
+    </header>
+
+    <main class="grid">
+      <section class="panel" aria-labelledby="secrets-title">
+        <div class="panel-header">
+          <h2 id="secrets-title">Secrets</h2>
+          <span class="badge" id="secrets-count">0</span>
+        </div>
+        <ul class="list" id="secrets-list" role="list">
+          <li class="empty">No secrets loaded yet.</li>
+        </ul>
+      </section>
+
+      <section class="panel" aria-labelledby="targets-title">
+        <div class="panel-header">
+          <h2 id="targets-title">Targets</h2>
+          <span class="badge" id="targets-count">0</span>
+        </div>
+        <ul class="list" id="targets-list" role="list">
+          <li class="empty">No targets loaded yet.</li>
+        </ul>
+      </section>
+
+      <section class="panel logs" aria-labelledby="logs-title">
+        <div class="panel-header">
+          <h2 id="logs-title">Recent Logs</h2>
+          <span class="badge" id="logs-count">0</span>
+        </div>
+        <div class="table" id="logs-table">
+          <div class="table-row table-header">
+            <span>Target</span>
+            <span>Status</span>
+            <span>IP</span>
+            <span>Code</span>
+            <span>Message</span>
+            <span>Timestamp</span>
+          </div>
+          <div class="table-row empty" id="logs-empty">No logs available.</div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        Data refreshes every 20 seconds. Endpoints: <code>/secrets</code>,
+        <code>/targets</code>, <code>/dashboard</code>.
+      </p>
+    </footer>
+
+    <script src="{{ url_for('webapp.static', filename='js/app.js') }}"></script>
+  </body>
+</html>
