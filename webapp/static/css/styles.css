@@ -197,6 +197,70 @@ h1 {
   border: 1px dashed rgba(103, 250, 255, 0.3);
 }
 
+.list-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.list-row-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  flex: 1;
+  min-width: 220px;
+}
+
+.list-card {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(8, 6, 18, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  min-width: 140px;
+  display: grid;
+  gap: 4px;
+  font-size: 0.82rem;
+}
+
+.list-card strong {
+  font-size: 0.9rem;
+}
+
+.list-card-meta {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.list-card-empty {
+  border: 1px dashed rgba(103, 250, 255, 0.4);
+  color: var(--muted);
+}
+
+.add-button {
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  border: 1px dashed rgba(103, 250, 255, 0.6);
+  background: rgba(103, 250, 255, 0.1);
+  color: var(--accent);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.add-button:hover {
+  border-style: solid;
+}
+
+.add-drawer {
+  margin-bottom: 20px;
+}
+
 .empty-card {
   border-radius: 16px;
   padding: 20px;
@@ -294,7 +358,6 @@ h1 {
 .form {
   display: grid;
   gap: 16px;
-  margin-bottom: 20px;
   padding: 16px;
   border-radius: 16px;
   background: rgba(8, 6, 18, 0.6);
