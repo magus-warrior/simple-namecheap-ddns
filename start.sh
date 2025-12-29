@@ -3,17 +3,18 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KEY_FILE="$REPO_ROOT/.flask_master_key"
+PYTHON_BIN="python"
 
 if [[ -z "${FLASK_MASTER_KEY:-}" ]]; then
   if [[ -f "$KEY_FILE" ]]; then
     export FLASK_MASTER_KEY
     FLASK_MASTER_KEY="$(<"$KEY_FILE")"
   else
-    if ! command -v python >/dev/null 2>&1; then
+    if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
       echo "python is required to generate FLASK_MASTER_KEY" >&2
       exit 1
     fi
-    FLASK_MASTER_KEY="$(python - <<'PY'
+    FLASK_MASTER_KEY="$("$PYTHON_BIN" - <<'PY'
 from cryptography.fernet import Fernet
 print(Fernet.generate_key().decode("utf-8"))
 PY
@@ -30,4 +31,4 @@ export FLASK_RUN_PORT="${FLASK_RUN_PORT:-8001}"
 export FLASK_RUN_HOST="${FLASK_RUN_HOST:-0.0.0.0}"
 
 cd "$REPO_ROOT"
-exec python -m flask run
+exec "$PYTHON_BIN" -m flask run
