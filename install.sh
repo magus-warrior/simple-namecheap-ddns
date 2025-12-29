@@ -98,7 +98,7 @@ update_python_paths() {
     sed -i -E "s#^Environment=AGENT_CONFIG_PATH=.*#Environment=AGENT_CONFIG_PATH=${AGENT_CONFIG_FILE}#" "$REPO_SERVICE_FILE"
     sed -i -E "s#^Environment=AGENT_DB_PATH=.*#Environment=AGENT_DB_PATH=${AGENT_DB_FILE}#" "$REPO_SERVICE_FILE"
     sed -i -E "s#^EnvironmentFile=.*#EnvironmentFile=${AGENT_ENV_FILE}#" "$REPO_SERVICE_FILE"
-    sed -i -E "s#^WorkingDirectory=.*#WorkingDirectory=${DATA_DIR}#" "$REPO_SERVICE_FILE"
+    sed -i -E "s#^WorkingDirectory=.*#WorkingDirectory=${REPO_ROOT}#" "$REPO_SERVICE_FILE"
     sed -i -E "s#^ExecStart=.*#ExecStart=/bin/bash -lc 'exec \"${REPO_ROOT}/start-agent.sh\"'#" "$REPO_SERVICE_FILE"
     sed -i -E "s#^User=.*#User=${SERVICE_USER}#" "$REPO_SERVICE_FILE"
     sed -i -E "s#^BindReadOnlyPaths=.*#BindReadOnlyPaths=${AGENT_CONFIG_FILE}#" "$REPO_SERVICE_FILE"
@@ -151,37 +151,58 @@ ensure_env_workdir() {
 setup_permissions() {
   local flask_db_path="${FLASK_DB_PATH:-${DATA_DIR}/webapp.db}"
   local sudoers_file="/etc/sudoers.d/ddns-admin"
+  local allow_system_wide="${DDNS_SYSTEM_WIDE:-}"
 
   if needs_root; then
     ensure_root
   fi
 
   if needs_root; then
-    if ! id -u ddns-admin >/dev/null 2>&1; then
-      ${SUDO_BIN} useradd --create-home --shell /bin/bash ddns-admin
-      info "Created user ddns-admin."
-    fi
+    if [[ "${allow_system_wide}" == "1" ]]; then
+      if ! id -u ddns-admin >/dev/null 2>&1; then
+        ${SUDO_BIN} useradd --create-home --shell /bin/bash ddns-admin
+        info "Created user ddns-admin."
+      fi
 
-    if ! id -u ddns-agent >/dev/null 2>&1; then
-      ${SUDO_BIN} useradd --system --no-create-home --shell /usr/sbin/nologin ddns-agent
-      info "Created user ddns-agent."
-    fi
+      if ! id -u ddns-agent >/dev/null 2>&1; then
+        ${SUDO_BIN} useradd --system --no-create-home --shell /usr/sbin/nologin ddns-agent
+        info "Created user ddns-agent."
+      fi
 
-    ${SUDO_BIN} install -d -m 0750 -o root -g root "${CONFIG_DIR}"
-    ${SUDO_BIN} install -d -m 0750 -o ddns-agent -g ddns-agent "${DATA_DIR}"
+      ${SUDO_BIN} install -d -m 0750 -o root -g root "${CONFIG_DIR}"
+      ${SUDO_BIN} install -d -m 0750 -o ddns-agent -g ddns-agent "${DATA_DIR}"
 
-    if [[ ! -f "${AGENT_CONFIG_FILE}" ]]; then
-      ${SUDO_BIN} install -m 0400 -o ddns-agent -g ddns-agent /dev/null "${AGENT_CONFIG_FILE}"
+      if [[ ! -f "${AGENT_CONFIG_FILE}" ]]; then
+        ${SUDO_BIN} install -m 0400 -o ddns-agent -g ddns-agent /dev/null "${AGENT_CONFIG_FILE}"
+      else
+        ${SUDO_BIN} chown ddns-agent:ddns-agent "${AGENT_CONFIG_FILE}"
+        ${SUDO_BIN} chmod 0400 "${AGENT_CONFIG_FILE}"
+      fi
+
+      if [[ ! -f "${AGENT_ENV_FILE}" ]]; then
+        ${SUDO_BIN} install -m 0400 -o root -g root /dev/null "${AGENT_ENV_FILE}"
+      else
+        ${SUDO_BIN} chown root:root "${AGENT_ENV_FILE}"
+        ${SUDO_BIN} chmod 0400 "${AGENT_ENV_FILE}"
+      fi
     else
-      ${SUDO_BIN} chown ddns-agent:ddns-agent "${AGENT_CONFIG_FILE}"
-      ${SUDO_BIN} chmod 0400 "${AGENT_CONFIG_FILE}"
-    fi
+      warn "DDNS_SYSTEM_WIDE not set; skipping system user and sudoers setup."
+      ${SUDO_BIN} install -d -m 0750 -o root -g root "${CONFIG_DIR}"
+      ${SUDO_BIN} install -d -m 0750 -o root -g root "${DATA_DIR}"
 
-    if [[ ! -f "${AGENT_ENV_FILE}" ]]; then
-      ${SUDO_BIN} install -m 0400 -o root -g root /dev/null "${AGENT_ENV_FILE}"
-    else
-      ${SUDO_BIN} chown root:root "${AGENT_ENV_FILE}"
-      ${SUDO_BIN} chmod 0400 "${AGENT_ENV_FILE}"
+      if [[ ! -f "${AGENT_CONFIG_FILE}" ]]; then
+        ${SUDO_BIN} install -m 0400 -o root -g root /dev/null "${AGENT_CONFIG_FILE}"
+      else
+        ${SUDO_BIN} chown root:root "${AGENT_CONFIG_FILE}"
+        ${SUDO_BIN} chmod 0400 "${AGENT_CONFIG_FILE}"
+      fi
+
+      if [[ ! -f "${AGENT_ENV_FILE}" ]]; then
+        ${SUDO_BIN} install -m 0400 -o root -g root /dev/null "${AGENT_ENV_FILE}"
+      else
+        ${SUDO_BIN} chown root:root "${AGENT_ENV_FILE}"
+        ${SUDO_BIN} chmod 0400 "${AGENT_ENV_FILE}"
+      fi
     fi
   else
     mkdir -p "${CONFIG_DIR}" "${DATA_DIR}"
@@ -208,13 +229,21 @@ PY
 
   if [[ ! -f "${flask_db_path}" ]]; then
     if needs_root; then
-      ${SUDO_BIN} install -m 0640 -o ddns-admin -g ddns-admin /dev/null "${flask_db_path}"
+      if [[ "${allow_system_wide}" == "1" ]]; then
+        ${SUDO_BIN} install -m 0640 -o ddns-admin -g ddns-admin /dev/null "${flask_db_path}"
+      else
+        ${SUDO_BIN} install -m 0640 -o root -g root /dev/null "${flask_db_path}"
+      fi
     else
       install -m 0640 /dev/null "${flask_db_path}"
     fi
   else
     if needs_root; then
-      ${SUDO_BIN} chown ddns-admin:ddns-admin "${flask_db_path}"
+      if [[ "${allow_system_wide}" == "1" ]]; then
+        ${SUDO_BIN} chown ddns-admin:ddns-admin "${flask_db_path}"
+      else
+        ${SUDO_BIN} chown root:root "${flask_db_path}"
+      fi
       ${SUDO_BIN} chmod 0640 "${flask_db_path}"
     else
       chmod 0640 "${flask_db_path}"
@@ -222,11 +251,15 @@ PY
   fi
 
   if needs_root; then
-    ${SUDO_BIN} tee "${sudoers_file}" >/dev/null <<'EOF'
+    if [[ "${allow_system_wide}" == "1" ]]; then
+      ${SUDO_BIN} tee "${sudoers_file}" >/dev/null <<'EOF'
 ddns-admin ALL=(root) NOPASSWD: /bin/systemctl reload ddns-agent
 EOF
-    ${SUDO_BIN} chmod 0440 "${sudoers_file}"
-    info "Permissions and system users configured."
+      ${SUDO_BIN} chmod 0440 "${sudoers_file}"
+      info "Permissions and system users configured."
+    else
+      info "Permissions configured without system users or sudoers."
+    fi
   else
     info "Permissions configured for local project directories."
   fi
