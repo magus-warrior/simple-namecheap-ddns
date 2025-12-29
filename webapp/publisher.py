@@ -110,4 +110,4 @@ class ConfigCompiler:
         os.replace(temp_name, self._config_path)
 
     def _reload_service(self) -> None:
-        subprocess.run([\"systemctl\", \"reload\", self._service_name], check=True)
+        subprocess.run(["systemctl", "reload", self._service_name], check=True)
