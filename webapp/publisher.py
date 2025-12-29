@@ -52,12 +52,17 @@ class ConfigCompiler:
             ip="{ip}",
             id=target.id,
         )
+        interval_minutes = getattr(target, "interval_minutes", None) or max(
+            1,
+            int(self._default_interval / 60),
+        )
+        interval_seconds = interval_minutes * 60
         return AgentTarget(
             id=str(target.id),
             hostname=hostname,
             update_url=update_url,
             encrypted_token=encrypted_token,
-            interval=self._default_interval,
+            interval=interval_seconds,
         )
 
     def compile(self, targets: Iterable[Target]) -> AgentConfig:

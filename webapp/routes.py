@@ -49,7 +49,22 @@ def _target_to_dict(target: Target) -> dict[str, Any]:
         "domain": target.domain,
         "secret_id": target.secret_id,
         "is_enabled": target.is_enabled,
+        "interval_minutes": target.interval_minutes,
     }
+
+
+def _coerce_interval_minutes(
+    payload: dict[str, Any],
+    default_minutes: int = 5,
+    use_default_if_missing: bool = False,
+) -> int | None:
+    if "interval_minutes" not in payload:
+        return default_minutes if use_default_if_missing else None
+    try:
+        value = int(payload.get("interval_minutes", default_minutes))
+    except (TypeError, ValueError):
+        return None
+    return value
 
 
 def _normalize_hostnames(value: str) -> str:
@@ -152,17 +167,25 @@ def create_target() -> Any:
     domain = payload.get("domain")
     secret_id = payload.get("secret_id")
     is_enabled = payload.get("is_enabled", True)
+    interval_minutes = _coerce_interval_minutes(
+        payload,
+        default_minutes=5,
+        use_default_if_missing=True,
+    )
     if not host or not domain or not secret_id:
         return jsonify({"error": "host, domain, and secret_id are required"}), 400
     normalized_host = _normalize_hostnames(host)
     if not normalized_host:
         return jsonify({"error": "host is required"}), 400
+    if interval_minutes is None or interval_minutes < 1:
+        return jsonify({"error": "interval_minutes must be a positive integer"}), 400
 
     target = Target(
         host=normalized_host,
         domain=domain,
         secret_id=secret_id,
         is_enabled=bool(is_enabled),
+        interval_minutes=interval_minutes,
     )
     db.session.add(target)
     db.session.commit()
@@ -190,6 +213,11 @@ def update_target(target_id: int) -> Any:
         target.secret_id = payload.get("secret_id")
     if "is_enabled" in payload:
         target.is_enabled = bool(payload.get("is_enabled"))
+    interval_minutes = _coerce_interval_minutes(payload)
+    if "interval_minutes" in payload:
+        if interval_minutes is None or interval_minutes < 1:
+            return jsonify({"error": "interval_minutes must be a positive integer"}), 400
+        target.interval_minutes = interval_minutes
     db.session.commit()
     return jsonify(_target_to_dict(target))
 

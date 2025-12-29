@@ -31,6 +31,7 @@ class Target(db.Model):
     domain = db.Column(db.String(255), nullable=False)
     secret_id = db.Column(db.Integer, db.ForeignKey("secrets.id"), nullable=False)
     is_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    interval_minutes = db.Column(db.Integer, nullable=False, default=5)
 
     secret = db.relationship("Secret", back_populates="targets")
 

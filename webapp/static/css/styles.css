@@ -234,6 +234,7 @@ h1 {
   background: rgba(8, 6, 18, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.05);
   font-size: 0.85rem;
+  align-items: center;
 }
 
 .secrets-table .table-row {
@@ -241,7 +242,27 @@ h1 {
 }
 
 .targets-table .table-row {
-  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(180px, 1.2fr);
+  grid-template-columns:
+    minmax(180px, 1.4fr)
+    minmax(90px, 0.6fr)
+    minmax(140px, 1fr)
+    minmax(120px, 0.7fr)
+    minmax(200px, 1.2fr);
+}
+
+.logs .table-row {
+  grid-template-columns:
+    minmax(180px, 1.4fr)
+    minmax(90px, 0.6fr)
+    minmax(120px, 0.7fr)
+    minmax(90px, 0.5fr)
+    minmax(220px, 2fr)
+    minmax(180px, 1fr);
+}
+
+.table-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .table-actions {
@@ -283,7 +304,7 @@ h1 {
 .form-row {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
 .form label {
