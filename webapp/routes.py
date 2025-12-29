@@ -211,6 +211,8 @@ def create_target() -> Any:
     )
     if not host or not domain or not secret_id:
         return jsonify({"error": "host, domain, and secret_id are required"}), 400
+    if not Secret.query.get(secret_id):
+        return jsonify({"error": "secret_id does not exist"}), 400
     normalized_host = _normalize_hostnames(host)
     if not normalized_host:
         return jsonify({"error": "host is required"}), 400
@@ -246,9 +248,17 @@ def update_target(target_id: int) -> Any:
             return jsonify({"error": "host is required"}), 400
         target.host = normalized_host
     if "domain" in payload:
-        target.domain = payload.get("domain")
+        domain = payload.get("domain")
+        if not domain:
+            return jsonify({"error": "domain is required"}), 400
+        target.domain = domain
     if "secret_id" in payload:
-        target.secret_id = payload.get("secret_id")
+        secret_id = payload.get("secret_id")
+        if not secret_id:
+            return jsonify({"error": "secret_id is required"}), 400
+        if not Secret.query.get(secret_id):
+            return jsonify({"error": "secret_id does not exist"}), 400
+        target.secret_id = secret_id
     if "is_enabled" in payload:
         target.is_enabled = bool(payload.get("is_enabled"))
     interval_minutes = _coerce_interval_minutes(payload)
