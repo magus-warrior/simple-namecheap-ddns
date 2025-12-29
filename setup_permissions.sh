@@ -33,6 +33,12 @@ else
   chmod 0400 "${DDNS_ENV_FILE}"
 fi
 
+if ! grep -q '^DDNS_WORKDIR=' "${DDNS_ENV_FILE}"; then
+  chmod 0600 "${DDNS_ENV_FILE}"
+  echo "DDNS_WORKDIR=$(pwd)" >> "${DDNS_ENV_FILE}"
+  chmod 0400 "${DDNS_ENV_FILE}"
+fi
+
 if [[ ! -f "${FLASK_DB_PATH}" ]]; then
   install -m 0640 -o ddns-admin -g ddns-admin /dev/null "${FLASK_DB_PATH}"
 else
