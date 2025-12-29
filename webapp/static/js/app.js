@@ -119,20 +119,26 @@ const renderTargets = (targets, secrets) => {
       row.innerHTML = `
         <span><strong>${formatTargetLabel(target)}</strong></span>
         <span>${target.is_enabled ? "Yes" : "No"}</span>
-        <span>—</span>
         <span>${secretNames[target.secret_id] ?? `Secret #${target.secret_id}`}</span>
-        <span>—</span>
-        <span>—</span>
-        <span>—</span>
-        <span>—</span>
         <span class="table-actions"></span>
       `;
       const actionsCell = row.querySelector(".table-actions");
-      const forceButton = buildActionButton("Force update", "ghost", () => {
-        setStatus("Force update requires the agent API.", true);
+      const forceButton = buildActionButton("Force update", "ghost", async () => {
+        forceButton.disabled = true;
+        setStatus(`Forcing update for ${formatTargetLabel(target)}…`);
+        try {
+          const payload = await forceTargetUpdate(target.id);
+          await loadData();
+          const summary = (payload.results ?? [])
+            .map((result) => `${result.hostname}: ${result.status === "success" ? "OK" : "FAIL"}`)
+            .join(", ");
+          setStatus(`Force update complete${summary ? ` • ${summary}` : ""}`);
+        } catch (error) {
+          setStatus(error.message || "Force update failed", true);
+        } finally {
+          forceButton.disabled = false;
+        }
       });
-      forceButton.disabled = true;
-      forceButton.title = "Requires agent API";
       actionsCell.appendChild(forceButton);
       actionsCell.appendChild(
         buildActionButton("Edit", "ghost", () => startTargetEdit(target))
@@ -365,6 +371,15 @@ const setTargetEnabled = async (target, isEnabled) => {
     return;
   }
   await loadData();
+};
+
+const forceTargetUpdate = async (targetId) => {
+  const response = await fetch(`/targets/${targetId}/force`, { method: "POST" });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "Force update failed");
+  }
+  return payload;
 };
 
 const deleteTarget = async (targetId) => {

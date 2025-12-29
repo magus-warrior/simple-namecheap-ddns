@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any
 
 from flask import Blueprint, current_app, jsonify, render_template, request
+import requests
 
+from agent.database import LogDB, UpdateRecord
 from shared_lib.security import CryptoManager
 from webapp.models import Secret, Target, db
 
@@ -59,6 +62,31 @@ def _normalize_hostnames(value: str) -> str:
         normalized.append(host)
         seen.add(host)
     return ", ".join(normalized)
+
+
+def _split_hostnames(value: str) -> list[str]:
+    return [host.strip() for host in value.split(",") if host.strip()]
+
+
+def _get_update_url_template() -> str:
+    return os.environ.get(
+        "AGENT_UPDATE_URL_TEMPLATE",
+        (
+            "https://dynamicdns.park-your-domain.com/update"
+            "?host={hostname}&domain={domain}&password={token}&ip={ip}"
+        ),
+    )
+
+
+def _fetch_public_ip() -> str | None:
+    check_ip_url = os.environ.get("AGENT_CHECK_IP_URL", "https://api.ipify.org")
+    try:
+        response = requests.get(check_ip_url, timeout=10)
+        response.raise_for_status()
+        return response.text.strip()
+    except requests.RequestException:
+        current_app.logger.exception("Unable to fetch public IP from %s", check_ip_url)
+        return None
 
 
 @bp.get("/secrets")
@@ -172,6 +200,76 @@ def delete_target(target_id: int) -> Any:
     db.session.delete(target)
     db.session.commit()
     return jsonify({"status": "deleted"})
+
+
+@bp.post("/targets/<int:target_id>/force")
+def force_target_update(target_id: int) -> Any:
+    target = Target.query.get_or_404(target_id)
+    try:
+        crypto = _get_crypto()
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    secret_value = crypto.decrypt_str(target.secret.encrypted_value)
+    ip_address = _fetch_public_ip()
+    if not ip_address:
+        return jsonify({"error": "Unable to fetch public IP"}), 502
+
+    hostnames = _split_hostnames(target.host)
+    if not hostnames:
+        return jsonify({"error": "Target hostnames are empty"}), 400
+
+    update_url_template = _get_update_url_template()
+    results: list[dict[str, Any]] = []
+    log_db = LogDB(current_app.config.get("AGENT_DB_PATH", "agent.db"))
+    try:
+        for hostname in hostnames:
+            update_url = update_url_template.format(
+                hostname=hostname,
+                domain=target.domain,
+                token=secret_value,
+                ip=ip_address,
+                id=target.id,
+            )
+            response_code = None
+            try:
+                response = requests.get(update_url, timeout=20)
+                response.raise_for_status()
+                message = response.text.strip()
+                status = "success"
+                response_code = response.status_code
+            except requests.RequestException as exc:
+                message = str(exc)
+                status = "error"
+                response_code = getattr(exc.response, "status_code", None)
+
+            log_db.log_update(
+                UpdateRecord(
+                    target_id=str(target.id),
+                    status=status,
+                    message=message,
+                    response_code=response_code,
+                    ip_address=ip_address,
+                )
+            )
+            results.append(
+                {
+                    "hostname": hostname,
+                    "status": status,
+                    "message": message,
+                    "response_code": response_code,
+                }
+            )
+    finally:
+        log_db.close()
+
+    return jsonify(
+        {
+            "target_id": target.id,
+            "ip_address": ip_address,
+            "results": results,
+        }
+    )
 
 
 @bp.get("/dashboard")
