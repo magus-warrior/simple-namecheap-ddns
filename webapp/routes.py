@@ -162,7 +162,7 @@ def dashboard() -> Any:
     limit = int(request.args.get("limit", 25))
     rows: list[dict[str, Any]] = []
     if not Path(db_path).is_file():
-        current_app.logger.warning("Agent DB not found at %s", db_path)
+        current_app.logger.info("Agent DB not found at %s", db_path)
         return jsonify({"logs": rows})
     try:
         connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)

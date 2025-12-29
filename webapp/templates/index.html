@@ -26,6 +26,23 @@
           <h2 id="secrets-title">Secrets</h2>
           <span class="badge" id="secrets-count">0</span>
         </div>
+        <form class="form" id="secret-form">
+          <div class="form-row">
+            <label>
+              Name
+              <input id="secret-name" name="name" type="text" placeholder="namecheap-token" required />
+            </label>
+            <label>
+              Token
+              <input id="secret-value" name="value" type="password" placeholder="API token" required />
+            </label>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="primary" id="secret-submit">Add secret</button>
+            <button type="button" class="ghost" id="secret-cancel" hidden>Cancel edit</button>
+          </div>
+          <p class="form-hint">Secrets are encrypted at rest and referenced by targets.</p>
+        </form>
         <ul class="list" id="secrets-list" role="list">
           <li class="empty">No secrets loaded yet.</li>
         </ul>
@@ -36,6 +53,33 @@
           <h2 id="targets-title">Targets</h2>
           <span class="badge" id="targets-count">0</span>
         </div>
+        <form class="form" id="target-form">
+          <div class="form-row">
+            <label>
+              Hostname
+              <input id="target-host" name="host" type="text" placeholder="home" required />
+            </label>
+            <label>
+              Domain
+              <input id="target-domain" name="domain" type="text" placeholder="example.com" required />
+            </label>
+          </div>
+          <div class="form-row">
+            <label>
+              Secret
+              <select id="target-secret" name="secret_id" required></select>
+            </label>
+            <label class="checkbox">
+              <input id="target-enabled" name="is_enabled" type="checkbox" checked />
+              Enabled
+            </label>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="primary" id="target-submit">Add target</button>
+            <button type="button" class="ghost" id="target-cancel" hidden>Cancel edit</button>
+          </div>
+          <p class="form-hint">Targets define the hostnames the agent keeps updated.</p>
+        </form>
         <ul class="list" id="targets-list" role="list">
           <li class="empty">No targets loaded yet.</li>
         </ul>

@@ -6,8 +6,23 @@ const LOGS_EMPTY = document.getElementById("logs-empty");
 const SECRETS_COUNT = document.getElementById("secrets-count");
 const TARGETS_COUNT = document.getElementById("targets-count");
 const LOGS_COUNT = document.getElementById("logs-count");
+const SECRET_FORM = document.getElementById("secret-form");
+const SECRET_NAME = document.getElementById("secret-name");
+const SECRET_VALUE = document.getElementById("secret-value");
+const SECRET_SUBMIT = document.getElementById("secret-submit");
+const SECRET_CANCEL = document.getElementById("secret-cancel");
+const TARGET_FORM = document.getElementById("target-form");
+const TARGET_HOST = document.getElementById("target-host");
+const TARGET_DOMAIN = document.getElementById("target-domain");
+const TARGET_SECRET = document.getElementById("target-secret");
+const TARGET_ENABLED = document.getElementById("target-enabled");
+const TARGET_SUBMIT = document.getElementById("target-submit");
+const TARGET_CANCEL = document.getElementById("target-cancel");
 
 const EMPTY_ROW_CLASS = "empty";
+const secretsCache = [];
+let editingSecretId = null;
+let editingTargetId = null;
 
 const setStatus = (text, isError = false) => {
   STATUS_PILL.textContent = text;
@@ -18,21 +33,39 @@ const clearList = (list) => {
   list.innerHTML = "";
 };
 
-const createListItem = (title, meta) => {
+const createListItem = (title, meta, actions = []) => {
   const item = document.createElement("li");
+  const main = document.createElement("div");
+  main.className = "item-main";
   const titleEl = document.createElement("strong");
   titleEl.textContent = title;
-  item.appendChild(titleEl);
+  main.appendChild(titleEl);
   if (meta) {
     const metaEl = document.createElement("span");
     metaEl.className = "meta";
     metaEl.textContent = meta;
-    item.appendChild(metaEl);
+    main.appendChild(metaEl);
+  }
+  item.appendChild(main);
+  if (actions.length) {
+    const actionRow = document.createElement("div");
+    actionRow.className = "item-actions";
+    actions.forEach((action) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `button ${action.variant ?? ""}`.trim();
+      button.textContent = action.label;
+      button.addEventListener("click", action.onClick);
+      actionRow.appendChild(button);
+    });
+    item.appendChild(actionRow);
   }
   return item;
 };
 
 const renderSecrets = (secrets) => {
+  secretsCache.length = 0;
+  secretsCache.push(...secrets);
   clearList(SECRETS_LIST);
   if (!secrets.length) {
     const empty = document.createElement("li");
@@ -41,10 +74,24 @@ const renderSecrets = (secrets) => {
     SECRETS_LIST.appendChild(empty);
   } else {
     secrets.forEach((secret) => {
-      SECRETS_LIST.appendChild(createListItem(secret.name, `ID: ${secret.id}`));
+      SECRETS_LIST.appendChild(
+        createListItem(secret.name, `ID: ${secret.id}`, [
+          {
+            label: "Edit",
+            variant: "ghost",
+            onClick: () => startSecretEdit(secret),
+          },
+          {
+            label: "Delete",
+            variant: "danger",
+            onClick: () => deleteSecret(secret.id),
+          },
+        ])
+      );
     });
   }
   SECRETS_COUNT.textContent = secrets.length;
+  refreshSecretOptions(secrets);
 };
 
 const renderTargets = (targets) => {
@@ -60,7 +107,19 @@ const renderTargets = (targets) => {
       TARGETS_LIST.appendChild(
         createListItem(
           `${target.host}.${target.domain}`,
-          `Secret ID: ${target.secret_id} · ${status}`
+          `Secret ID: ${target.secret_id} · ${status}`,
+          [
+            {
+              label: "Edit",
+              variant: "ghost",
+              onClick: () => startTargetEdit(target),
+            },
+            {
+              label: "Delete",
+              variant: "danger",
+              onClick: () => deleteTarget(target.id),
+            },
+          ]
         )
       );
     });
@@ -91,6 +150,155 @@ const renderLogs = (logs) => {
   LOGS_COUNT.textContent = logs.length;
 };
 
+const refreshSecretOptions = (secrets) => {
+  TARGET_SECRET.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = secrets.length ? "Select a secret" : "Add a secret first";
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  TARGET_SECRET.appendChild(placeholder);
+  secrets.forEach((secret) => {
+    const option = document.createElement("option");
+    option.value = String(secret.id);
+    option.textContent = `${secret.name} (ID ${secret.id})`;
+    TARGET_SECRET.appendChild(option);
+  });
+  TARGET_SECRET.disabled = secrets.length === 0;
+  TARGET_SUBMIT.disabled = secrets.length === 0;
+};
+
+const resetSecretForm = () => {
+  editingSecretId = null;
+  SECRET_FORM.reset();
+  SECRET_SUBMIT.textContent = "Add secret";
+  SECRET_CANCEL.hidden = true;
+};
+
+const resetTargetForm = () => {
+  editingTargetId = null;
+  TARGET_FORM.reset();
+  TARGET_ENABLED.checked = true;
+  TARGET_SUBMIT.textContent = "Add target";
+  TARGET_CANCEL.hidden = true;
+};
+
+const startSecretEdit = (secret) => {
+  editingSecretId = secret.id;
+  SECRET_NAME.value = secret.name;
+  SECRET_VALUE.value = "";
+  SECRET_SUBMIT.textContent = "Update secret";
+  SECRET_CANCEL.hidden = false;
+  SECRET_NAME.focus();
+};
+
+const startTargetEdit = (target) => {
+  editingTargetId = target.id;
+  TARGET_HOST.value = target.host;
+  TARGET_DOMAIN.value = target.domain;
+  TARGET_SECRET.value = String(target.secret_id);
+  TARGET_ENABLED.checked = Boolean(target.is_enabled);
+  TARGET_SUBMIT.textContent = "Update target";
+  TARGET_CANCEL.hidden = false;
+  TARGET_HOST.focus();
+};
+
+const createSecret = async () => {
+  const payload = {
+    name: SECRET_NAME.value.trim(),
+    value: SECRET_VALUE.value.trim(),
+  };
+  const response = await fetch("/secrets", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error("Unable to create secret");
+  }
+};
+
+const updateSecret = async (secretId) => {
+  const payload = {
+    name: SECRET_NAME.value.trim(),
+  };
+  if (SECRET_VALUE.value.trim()) {
+    payload.value = SECRET_VALUE.value.trim();
+  }
+  const response = await fetch(`/secrets/${secretId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error("Unable to update secret");
+  }
+};
+
+const deleteSecret = async (secretId) => {
+  if (!confirm("Delete this secret? Targets using it will fail to update.")) {
+    return;
+  }
+  const response = await fetch(`/secrets/${secretId}`, { method: "DELETE" });
+  if (!response.ok) {
+    setStatus("Failed to delete secret", true);
+    return;
+  }
+  if (editingSecretId === secretId) {
+    resetSecretForm();
+  }
+  loadData();
+};
+
+const createTarget = async () => {
+  const payload = {
+    host: TARGET_HOST.value.trim(),
+    domain: TARGET_DOMAIN.value.trim(),
+    secret_id: Number(TARGET_SECRET.value),
+    is_enabled: TARGET_ENABLED.checked,
+  };
+  const response = await fetch("/targets", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error("Unable to create target");
+  }
+};
+
+const updateTarget = async (targetId) => {
+  const payload = {
+    host: TARGET_HOST.value.trim(),
+    domain: TARGET_DOMAIN.value.trim(),
+    secret_id: Number(TARGET_SECRET.value),
+    is_enabled: TARGET_ENABLED.checked,
+  };
+  const response = await fetch(`/targets/${targetId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error("Unable to update target");
+  }
+};
+
+const deleteTarget = async (targetId) => {
+  if (!confirm("Delete this target?")) {
+    return;
+  }
+  const response = await fetch(`/targets/${targetId}`, { method: "DELETE" });
+  if (!response.ok) {
+    setStatus("Failed to delete target", true);
+    return;
+  }
+  if (editingTargetId === targetId) {
+    resetTargetForm();
+  }
+  loadData();
+};
+
 const loadData = async () => {
   try {
     setStatus("Syncing neon data streams…");
@@ -115,6 +323,46 @@ const loadData = async () => {
     setStatus("Data sync failed — check server", true);
   }
 };
+
+SECRET_FORM.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    setStatus(editingSecretId ? "Updating secret…" : "Creating secret…");
+    if (editingSecretId) {
+      await updateSecret(editingSecretId);
+    } else {
+      await createSecret();
+    }
+    resetSecretForm();
+    await loadData();
+  } catch (error) {
+    setStatus("Secret save failed — check inputs", true);
+  }
+});
+
+SECRET_CANCEL.addEventListener("click", () => {
+  resetSecretForm();
+});
+
+TARGET_FORM.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    setStatus(editingTargetId ? "Updating target…" : "Creating target…");
+    if (editingTargetId) {
+      await updateTarget(editingTargetId);
+    } else {
+      await createTarget();
+    }
+    resetTargetForm();
+    await loadData();
+  } catch (error) {
+    setStatus("Target save failed — check inputs", true);
+  }
+});
+
+TARGET_CANCEL.addEventListener("click", () => {
+  resetTargetForm();
+});
 
 loadData();
 setInterval(loadData, 20000);
