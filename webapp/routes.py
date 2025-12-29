@@ -46,7 +46,9 @@ def _get_agent_key() -> str:
     if key:
         return key
 
-    workdir = os.environ.get("DDNS_WORKDIR", ".")
+    workdir = os.environ.get("DDNS_WORKDIR")
+    if not workdir:
+        workdir = str(Path(__file__).resolve().parents[1])
     env_path = Path(workdir) / ".ddns" / "agent.env"
     if env_path.is_file():
         for line in env_path.read_text(encoding="utf-8").splitlines():

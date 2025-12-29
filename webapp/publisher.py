@@ -32,7 +32,9 @@ class ConfigCompiler:
     ) -> None:
         resolved_config_path = config_path or os.environ.get("AGENT_CONFIG_PATH")
         if resolved_config_path is None:
-            workdir = os.environ.get("DDNS_WORKDIR", ".")
+            workdir = os.environ.get("DDNS_WORKDIR")
+            if not workdir:
+                workdir = str(Path(__file__).resolve().parents[1])
             resolved_config_path = str(
                 Path(workdir) / ".ddns" / "config.enc.json"
             )
