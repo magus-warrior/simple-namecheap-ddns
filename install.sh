@@ -37,9 +37,9 @@ ensure_root() {
 
 find_python() {
   local python_bin
-  python_bin="$(command -v python3 || true)"
+  python_bin="$(which python3 2>/dev/null || true)"
   if [[ -z "$python_bin" ]]; then
-    python_bin="$(command -v python || true)"
+    python_bin="$(which python 2>/dev/null || true)"
   fi
 
   if [[ -z "$python_bin" ]]; then
@@ -56,7 +56,7 @@ update_python_paths() {
   python_bin="$(find_python)"
 
   if [[ -f "$REPO_SERVICE_FILE" ]]; then
-    sed -i -E "s#^ExecStart=.* -m agent\.main#ExecStart=${python_bin} -m agent.main#" "$REPO_SERVICE_FILE"
+    sed -i -E "s#^ExecStart=.*#ExecStart=/var/lib/ddns-agent/start-agent.sh#" "$REPO_SERVICE_FILE"
     info "Updated ${REPO_SERVICE_FILE} ExecStart."
   else
     warn "Missing ${REPO_SERVICE_FILE}; cannot update ExecStart."
