@@ -1,6 +1,11 @@
 const STATUS_PILL = document.getElementById("status-pill");
-const SECRETS_LIST = document.getElementById("secrets-list");
-const TARGETS_LIST = document.getElementById("targets-list");
+const SECRETS_TABLE = document.getElementById("secrets-table");
+const SECRETS_EMPTY = document.getElementById("secrets-empty");
+const SECRET_EMPTY_ADD = document.getElementById("secret-empty-add");
+const TARGETS_TABLE = document.getElementById("targets-table");
+const TARGETS_EMPTY = document.getElementById("targets-empty");
+const TARGET_EMPTY_ADD = document.getElementById("target-empty-add");
+const TARGETS_EMPTY_HELPER = document.getElementById("targets-empty-helper");
 const LOGS_TABLE = document.getElementById("logs-table");
 const LOGS_EMPTY = document.getElementById("logs-empty");
 const SECRETS_COUNT = document.getElementById("secrets-count");
@@ -18,8 +23,8 @@ const TARGET_SECRET = document.getElementById("target-secret");
 const TARGET_ENABLED = document.getElementById("target-enabled");
 const TARGET_SUBMIT = document.getElementById("target-submit");
 const TARGET_CANCEL = document.getElementById("target-cancel");
+const TARGET_SECRET_HINT = document.getElementById("target-secret-hint");
 
-const EMPTY_ROW_CLASS = "empty";
 const secretsCache = [];
 let editingSecretId = null;
 let editingTargetId = null;
@@ -29,125 +34,169 @@ const setStatus = (text, isError = false) => {
   STATUS_PILL.style.borderColor = isError ? "rgba(255, 103, 242, 0.9)" : "rgba(103, 250, 255, 0.6)";
 };
 
-const clearList = (list) => {
-  list.innerHTML = "";
+const clearTableRows = (table) => {
+  table.querySelectorAll(".table-row.data-row").forEach((row) => row.remove());
 };
 
-const createListItem = (title, meta, actions = []) => {
-  const item = document.createElement("li");
-  const main = document.createElement("div");
-  main.className = "item-main";
-  const titleEl = document.createElement("strong");
-  titleEl.textContent = title;
-  main.appendChild(titleEl);
-  if (meta) {
-    const metaEl = document.createElement("span");
-    metaEl.className = "meta";
-    metaEl.textContent = meta;
-    main.appendChild(metaEl);
-  }
-  item.appendChild(main);
-  if (actions.length) {
-    const actionRow = document.createElement("div");
-    actionRow.className = "item-actions";
-    actions.forEach((action) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = `button ${action.variant ?? ""}`.trim();
-      button.textContent = action.label;
-      button.addEventListener("click", action.onClick);
-      actionRow.appendChild(button);
-    });
-    item.appendChild(actionRow);
-  }
-  return item;
+const formatTargetLabel = (target) => {
+  const host = target.host === "@" ? "root" : target.host;
+  return `${host}.${target.domain}`;
 };
 
-const renderSecrets = (secrets) => {
+const formatTime = (timestamp) => {
+  return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+};
+
+const renderSecrets = (secrets, targets) => {
   secretsCache.length = 0;
   secretsCache.push(...secrets);
-  clearList(SECRETS_LIST);
+  clearTableRows(SECRETS_TABLE);
   if (!secrets.length) {
-    const empty = document.createElement("li");
-    empty.className = EMPTY_ROW_CLASS;
-    empty.textContent = "No secrets configured yet.";
-    SECRETS_LIST.appendChild(empty);
+    SECRETS_EMPTY.hidden = false;
+    SECRETS_TABLE.hidden = true;
   } else {
+    SECRETS_EMPTY.hidden = true;
+    SECRETS_TABLE.hidden = false;
+    const usageCounts = targets.reduce((acc, target) => {
+      acc[target.secret_id] = (acc[target.secret_id] ?? 0) + 1;
+      return acc;
+    }, {});
     secrets.forEach((secret) => {
-      SECRETS_LIST.appendChild(
-        createListItem(secret.name, `ID: ${secret.id}`, [
-          {
-            label: "Edit",
-            variant: "ghost",
-            onClick: () => startSecretEdit(secret),
-          },
-          {
-            label: "Delete",
-            variant: "danger",
-            onClick: () => deleteSecret(secret.id),
-          },
-        ])
+      const row = document.createElement("div");
+      row.className = "table-row data-row";
+      const usageCount = usageCounts[secret.id] ?? 0;
+      row.innerHTML = `
+        <span><strong>${secret.name}</strong></span>
+        <span>—</span>
+        <span>${usageCount} target${usageCount === 1 ? "" : "s"}</span>
+        <span class="table-actions"></span>
+      `;
+      const actionsCell = row.querySelector(".table-actions");
+      const mask = document.createElement("span");
+      mask.className = "mask";
+      mask.textContent = "••••••";
+      actionsCell.appendChild(mask);
+      actionsCell.appendChild(
+        buildActionButton("Edit name", "ghost", () => startSecretEdit(secret))
       );
+      actionsCell.appendChild(
+        buildActionButton("Rotate", "primary", () => startSecretRotate(secret))
+      );
+      actionsCell.appendChild(
+        buildActionButton("Delete", "danger", () => deleteSecret(secret.id))
+      );
+      SECRETS_TABLE.appendChild(row);
     });
   }
   SECRETS_COUNT.textContent = secrets.length;
   refreshSecretOptions(secrets);
 };
 
-const renderTargets = (targets) => {
-  clearList(TARGETS_LIST);
+const renderTargets = (targets, secrets) => {
+  clearTableRows(TARGETS_TABLE);
   if (!targets.length) {
-    const empty = document.createElement("li");
-    empty.className = EMPTY_ROW_CLASS;
-    empty.textContent = "No targets configured yet.";
-    TARGETS_LIST.appendChild(empty);
+    TARGETS_EMPTY.hidden = false;
+    TARGETS_TABLE.hidden = true;
   } else {
+    TARGETS_EMPTY.hidden = true;
+    TARGETS_TABLE.hidden = false;
+    const secretNames = secrets.reduce((acc, secret) => {
+      acc[secret.id] = secret.name;
+      return acc;
+    }, {});
     targets.forEach((target) => {
-      const status = target.is_enabled ? "Enabled" : "Disabled";
-      TARGETS_LIST.appendChild(
-        createListItem(
-          `${target.host}.${target.domain}`,
-          `Secret ID: ${target.secret_id} · ${status}`,
-          [
-            {
-              label: "Edit",
-              variant: "ghost",
-              onClick: () => startTargetEdit(target),
-            },
-            {
-              label: "Delete",
-              variant: "danger",
-              onClick: () => deleteTarget(target.id),
-            },
-          ]
+      const row = document.createElement("div");
+      row.className = "table-row data-row";
+      row.innerHTML = `
+        <span><strong>${formatTargetLabel(target)}</strong></span>
+        <span>${target.is_enabled ? "Yes" : "No"}</span>
+        <span>—</span>
+        <span>${secretNames[target.secret_id] ?? `Secret #${target.secret_id}`}</span>
+        <span>—</span>
+        <span>—</span>
+        <span>—</span>
+        <span>—</span>
+        <span class="table-actions"></span>
+      `;
+      const actionsCell = row.querySelector(".table-actions");
+      const forceButton = buildActionButton("Force update", "ghost", () => {
+        setStatus("Force update requires the agent API.", true);
+      });
+      forceButton.disabled = true;
+      forceButton.title = "Requires agent API";
+      actionsCell.appendChild(forceButton);
+      actionsCell.appendChild(
+        buildActionButton("Edit", "ghost", () => startTargetEdit(target))
+      );
+      actionsCell.appendChild(
+        buildActionButton(target.is_enabled ? "Disable" : "Enable", "primary", () =>
+          setTargetEnabled(target, !target.is_enabled)
         )
       );
+      actionsCell.appendChild(
+        buildActionButton("Delete", "danger", () => deleteTarget(target.id))
+      );
+      TARGETS_TABLE.appendChild(row);
     });
   }
   TARGETS_COUNT.textContent = targets.length;
 };
 
-const renderLogs = (logs) => {
+const parseAgentMessage = (message) => {
+  if (!message) {
+    return { errCount: "-", errorSummary: "-" };
+  }
+  const errCountMatch = message.match(/<ErrCount>(\d+)<\/ErrCount>/i);
+  const errCount = errCountMatch ? errCountMatch[1] : "-";
+  const errors = [];
+  const errorRegex = /<Err\d+>(.*?)<\/Err\d+>/gi;
+  let match = errorRegex.exec(message);
+  while (match) {
+    errors.push(match[1]);
+    match = errorRegex.exec(message);
+  }
+  let errorSummary = errors.length ? errors.join("; ") : message;
+  if (errCount === "0" && !errors.length) {
+    errorSummary = "—";
+  }
+  return { errCount, errorSummary };
+};
+
+const renderLogs = (logs, targets) => {
   LOGS_TABLE.querySelectorAll(".table-row.log-row").forEach((row) => row.remove());
   if (!logs.length) {
     LOGS_EMPTY.style.display = "block";
   } else {
     LOGS_EMPTY.style.display = "none";
+    const targetLabels = targets.reduce((acc, target) => {
+      acc[target.id] = formatTargetLabel(target);
+      return acc;
+    }, {});
     logs.forEach((log) => {
+      const parsed = parseAgentMessage(log.message);
       const row = document.createElement("div");
       row.className = "table-row log-row";
       row.innerHTML = `
-        <span>#${log.target_id}</span>
-        <span>${log.status}</span>
+        <span>${targetLabels[log.target_id] ?? `Target #${log.target_id}`}</span>
+        <span>${log.status === "success" ? "OK" : "FAIL"}</span>
         <span>${log.ip_address ?? "-"}</span>
-        <span>${log.response_code ?? "-"}</span>
-        <span>${log.message ?? "-"}</span>
+        <span>${parsed.errCount}</span>
+        <span>${parsed.errorSummary}</span>
         <span>${new Date(log.created_at).toLocaleString()}</span>
       `;
       LOGS_TABLE.appendChild(row);
     });
   }
   LOGS_COUNT.textContent = logs.length;
+};
+
+const buildActionButton = (label, variant, onClick) => {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `button ${variant ?? ""}`.trim();
+  button.textContent = label;
+  button.addEventListener("click", onClick);
+  return button;
 };
 
 const refreshSecretOptions = (secrets) => {
@@ -166,6 +215,9 @@ const refreshSecretOptions = (secrets) => {
   });
   TARGET_SECRET.disabled = secrets.length === 0;
   TARGET_SUBMIT.disabled = secrets.length === 0;
+  TARGET_EMPTY_ADD.disabled = secrets.length === 0;
+  TARGETS_EMPTY_HELPER.hidden = secrets.length !== 0;
+  TARGET_SECRET_HINT.hidden = secrets.length !== 0;
 };
 
 const resetSecretForm = () => {
@@ -190,6 +242,15 @@ const startSecretEdit = (secret) => {
   SECRET_SUBMIT.textContent = "Update secret";
   SECRET_CANCEL.hidden = false;
   SECRET_NAME.focus();
+};
+
+const startSecretRotate = (secret) => {
+  editingSecretId = secret.id;
+  SECRET_NAME.value = secret.name;
+  SECRET_VALUE.value = "";
+  SECRET_SUBMIT.textContent = "Rotate secret";
+  SECRET_CANCEL.hidden = false;
+  SECRET_VALUE.focus();
 };
 
 const startTargetEdit = (target) => {
@@ -284,6 +345,19 @@ const updateTarget = async (targetId) => {
   }
 };
 
+const setTargetEnabled = async (target, isEnabled) => {
+  const response = await fetch(`/targets/${target.id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ is_enabled: isEnabled }),
+  });
+  if (!response.ok) {
+    setStatus("Failed to update target", true);
+    return;
+  }
+  await loadData();
+};
+
 const deleteTarget = async (targetId) => {
   if (!confirm("Delete this target?")) {
     return;
@@ -315,12 +389,13 @@ const loadData = async () => {
       targetsResponse.json(),
       logsResponse.json(),
     ]);
-    renderSecrets(secrets);
-    renderTargets(targets);
-    renderLogs(logsPayload.logs ?? []);
-    setStatus("Live sync complete");
+    renderSecrets(secrets, targets);
+    renderTargets(targets, secrets);
+    renderLogs(logsPayload.logs ?? [], targets);
+    const refreshTime = formatTime(Date.now());
+    setStatus(`Status loaded from agent log store • Last refresh ${refreshTime} • Config publish: —`);
   } catch (error) {
-    setStatus("Data sync failed — check server", true);
+    setStatus("Agent log store unreachable • Last refresh —", true);
   }
 };
 
@@ -362,6 +437,14 @@ TARGET_FORM.addEventListener("submit", async (event) => {
 
 TARGET_CANCEL.addEventListener("click", () => {
   resetTargetForm();
+});
+
+SECRET_EMPTY_ADD.addEventListener("click", () => {
+  SECRET_NAME.focus();
+});
+
+TARGET_EMPTY_ADD.addEventListener("click", () => {
+  TARGET_HOST.focus();
 });
 
 loadData();

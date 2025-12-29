@@ -13,7 +13,7 @@
         <p class="eyebrow">DDNS Control Panel</p>
         <h1>Simple Namecheap Dashboard</h1>
         <p class="subtitle">
-          Monitor secrets, targets, and recent update logs in a neon-charged command
+          Monitor secrets, targets, and recent agent update history in a neon-charged command
           center.
         </p>
       </div>
@@ -43,9 +43,18 @@
           </div>
           <p class="form-hint">Secrets are encrypted at rest and referenced by targets.</p>
         </form>
-        <ul class="list" id="secrets-list" role="list">
-          <li class="empty">No secrets loaded yet.</li>
-        </ul>
+        <div class="empty-card" id="secrets-empty">
+          <p>No secrets configured yet.</p>
+          <button type="button" class="primary" id="secret-empty-add">Add secret</button>
+        </div>
+        <div class="table secrets-table" id="secrets-table" hidden>
+          <div class="table-row table-header">
+            <span>Name</span>
+            <span>Last rotated</span>
+            <span>In use by</span>
+            <span>Actions</span>
+          </div>
+        </div>
       </section>
 
       <section class="panel" aria-labelledby="targets-title">
@@ -78,25 +87,43 @@
             <button type="submit" class="primary" id="target-submit">Add target</button>
             <button type="button" class="ghost" id="target-cancel" hidden>Cancel edit</button>
           </div>
+          <p class="form-hint" id="target-secret-hint" hidden>Add a secret first.</p>
           <p class="form-hint">Targets define the hostnames the agent keeps updated.</p>
         </form>
-        <ul class="list" id="targets-list" role="list">
-          <li class="empty">No targets loaded yet.</li>
-        </ul>
+        <div class="empty-card" id="targets-empty">
+          <p>No targets configured yet.</p>
+          <div class="empty-actions">
+            <button type="button" class="primary" id="target-empty-add">Add target</button>
+            <span class="helper-text" id="targets-empty-helper">Add a secret first.</span>
+          </div>
+        </div>
+        <div class="table targets-table" id="targets-table" hidden>
+          <div class="table-row table-header">
+            <span>Target</span>
+            <span>Enabled</span>
+            <span>Interval</span>
+            <span>Secret</span>
+            <span>Last IP</span>
+            <span>Last Update</span>
+            <span>Status</span>
+            <span>Next Run</span>
+            <span>Actions</span>
+          </div>
+        </div>
       </section>
 
       <section class="panel logs" aria-labelledby="logs-title">
         <div class="panel-header">
-          <h2 id="logs-title">Recent Logs</h2>
+          <h2 id="logs-title">Recent Updates (Agent)</h2>
           <span class="badge" id="logs-count">0</span>
         </div>
         <div class="table" id="logs-table">
           <div class="table-row table-header">
             <span>Target</span>
-            <span>Status</span>
+            <span>Result</span>
             <span>IP</span>
-            <span>Code</span>
-            <span>Message</span>
+            <span>ErrCount</span>
+            <span>Error</span>
             <span>Timestamp</span>
           </div>
           <div class="table-row empty" id="logs-empty">No logs available.</div>
