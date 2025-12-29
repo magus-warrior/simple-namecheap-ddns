@@ -9,6 +9,7 @@ AGENT_ENV_FILE="/etc/ddns-agent/agent.env"
 REPO_SERVICE_FILE="${REPO_ROOT}/${SERVICE_NAME}"
 START_FILE="${REPO_ROOT}/start.sh"
 REQUIREMENTS_FILE="${REPO_ROOT}/requirements.txt"
+SUDO_BIN=""
 
 color() {
   local code="$1"
@@ -30,15 +31,37 @@ error() {
 
 ensure_root() {
   if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-    error "This option must be run as root."
-    return 1
+    if command -v sudo >/dev/null 2>&1; then
+      SUDO_BIN="sudo"
+    else
+      error "This option must be run as root (sudo not available)."
+      return 1
+    fi
   fi
 }
 
 find_python() {
   local python_bin
+  if [[ -n "${DDNS_PYTHON_BIN:-}" ]]; then
+    if [[ -x "${DDNS_PYTHON_BIN}" ]]; then
+      echo "${DDNS_PYTHON_BIN}"
+      return 0
+    fi
+    warn "DDNS_PYTHON_BIN is set but not executable: ${DDNS_PYTHON_BIN}"
+  fi
+
+  if [[ -n "${VIRTUAL_ENV:-}" && -x "${VIRTUAL_ENV}/bin/python" ]]; then
+    echo "${VIRTUAL_ENV}/bin/python"
+    return 0
+  fi
+
+  if [[ -n "${CONDA_PREFIX:-}" && -x "${CONDA_PREFIX}/bin/python" ]]; then
+    echo "${CONDA_PREFIX}/bin/python"
+    return 0
+  fi
+
   if [[ "${EUID:-$(id -u)}" -eq 0 && -n "${SUDO_USER:-}" ]]; then
-    python_bin="$(sudo -u "$SUDO_USER" -H bash -lc 'command -v python3 || command -v python' 2>/dev/null || true)"
+    python_bin="$(${SUDO_BIN:-sudo} -u "$SUDO_USER" -H bash -lc 'command -v python3 || command -v python' 2>/dev/null || true)"
   else
     python_bin="$(which python3 2>/dev/null || true)"
   fi
@@ -91,10 +114,10 @@ ensure_env_workdir() {
     END { if (!found) print workdir }
   ' "${AGENT_ENV_FILE}" > "${temp_file}"
 
-  chmod 0600 "${AGENT_ENV_FILE}"
-  cat "${temp_file}" > "${AGENT_ENV_FILE}"
+  ${SUDO_BIN} chmod 0600 "${AGENT_ENV_FILE}"
+  ${SUDO_BIN} tee "${AGENT_ENV_FILE}" >/dev/null < "${temp_file}"
   rm -f "${temp_file}"
-  chmod 0400 "${AGENT_ENV_FILE}"
+  ${SUDO_BIN} chmod 0400 "${AGENT_ENV_FILE}"
   info "Updated DDNS_WORKDIR in ${AGENT_ENV_FILE}."
 }
 
@@ -109,36 +132,36 @@ setup_permissions() {
   local sudoers_file="/etc/sudoers.d/ddns-admin"
 
   if ! id -u ddns-admin >/dev/null 2>&1; then
-    useradd --create-home --shell /bin/bash ddns-admin
+    ${SUDO_BIN} useradd --create-home --shell /bin/bash ddns-admin
     info "Created user ddns-admin."
   fi
 
   if ! id -u ddns-agent >/dev/null 2>&1; then
-    useradd --system --no-create-home --shell /usr/sbin/nologin ddns-agent
+    ${SUDO_BIN} useradd --system --no-create-home --shell /usr/sbin/nologin ddns-agent
     info "Created user ddns-agent."
   fi
 
-  install -d -m 0750 -o root -g root "${config_dir}"
-  install -d -m 0750 -o ddns-agent -g ddns-agent "${data_dir}"
+  ${SUDO_BIN} install -d -m 0750 -o root -g root "${config_dir}"
+  ${SUDO_BIN} install -d -m 0750 -o ddns-agent -g ddns-agent "${data_dir}"
 
   if [[ ! -f "${config_file}" ]]; then
-    install -m 0400 -o ddns-agent -g ddns-agent /dev/null "${config_file}"
+    ${SUDO_BIN} install -m 0400 -o ddns-agent -g ddns-agent /dev/null "${config_file}"
   else
-    chown ddns-agent:ddns-agent "${config_file}"
-    chmod 0400 "${config_file}"
+    ${SUDO_BIN} chown ddns-agent:ddns-agent "${config_file}"
+    ${SUDO_BIN} chmod 0400 "${config_file}"
   fi
 
   if [[ ! -f "${env_file}" ]]; then
-    install -m 0400 -o root -g root /dev/null "${env_file}"
+    ${SUDO_BIN} install -m 0400 -o root -g root /dev/null "${env_file}"
   else
-    chown root:root "${env_file}"
-    chmod 0400 "${env_file}"
+    ${SUDO_BIN} chown root:root "${env_file}"
+    ${SUDO_BIN} chmod 0400 "${env_file}"
   fi
 
   ensure_env_workdir
 
   if ! grep -q '^AGENT_MASTER_KEY=' "${env_file}"; then
-    chmod 0600 "${env_file}"
+    ${SUDO_BIN} chmod 0600 "${env_file}"
     local agent_key
     agent_key="$(python3 - <<'PY'
 import base64
@@ -147,22 +170,22 @@ import os
 print(base64.urlsafe_b64encode(os.urandom(32)).decode("utf-8"))
 PY
 )"
-    echo "AGENT_MASTER_KEY=${agent_key}" >> "${env_file}"
-    chmod 0400 "${env_file}"
+    echo "AGENT_MASTER_KEY=${agent_key}" | ${SUDO_BIN} tee -a "${env_file}" >/dev/null
+    ${SUDO_BIN} chmod 0400 "${env_file}"
     info "Generated AGENT_MASTER_KEY in ${env_file}."
   fi
 
   if [[ ! -f "${flask_db_path}" ]]; then
-    install -m 0640 -o ddns-admin -g ddns-admin /dev/null "${flask_db_path}"
+    ${SUDO_BIN} install -m 0640 -o ddns-admin -g ddns-admin /dev/null "${flask_db_path}"
   else
-    chown ddns-admin:ddns-admin "${flask_db_path}"
-    chmod 0640 "${flask_db_path}"
+    ${SUDO_BIN} chown ddns-admin:ddns-admin "${flask_db_path}"
+    ${SUDO_BIN} chmod 0640 "${flask_db_path}"
   fi
 
-  cat > "${sudoers_file}" <<'EOF'
+  ${SUDO_BIN} tee "${sudoers_file}" >/dev/null <<'EOF'
 ddns-admin ALL=(root) NOPASSWD: /bin/systemctl reload ddns-agent
 EOF
-  chmod 0440 "${sudoers_file}"
+  ${SUDO_BIN} chmod 0440 "${sudoers_file}"
   info "Permissions and system users configured."
 }
 
@@ -176,23 +199,23 @@ install_service() {
     return 1
   fi
 
-  install -m 0644 "$REPO_SERVICE_FILE" "$SYSTEMD_SERVICE_PATH"
-  systemctl daemon-reload
+  ${SUDO_BIN} install -m 0644 "$REPO_SERVICE_FILE" "$SYSTEMD_SERVICE_PATH"
+  ${SUDO_BIN} systemctl daemon-reload
   info "Installed ${SERVICE_NAME} to ${SYSTEMD_SERVICE_PATH}."
 
-  if systemctl is-enabled --quiet "$SERVICE_NAME"; then
+  if ${SUDO_BIN} systemctl is-enabled --quiet "$SERVICE_NAME"; then
     info "${SERVICE_NAME} is already enabled."
   else
     read -r -p "Enable ${SERVICE_NAME} on boot? [y/N]: " enable_choice
     if [[ "${enable_choice,,}" == "y" ]]; then
-      systemctl enable "$SERVICE_NAME"
+      ${SUDO_BIN} systemctl enable "$SERVICE_NAME"
       info "Enabled ${SERVICE_NAME}."
     fi
   fi
 
   read -r -p "Start/restart ${SERVICE_NAME} now? [y/N]: " start_choice
   if [[ "${start_choice,,}" == "y" ]]; then
-    systemctl restart "$SERVICE_NAME"
+    ${SUDO_BIN} systemctl restart "$SERVICE_NAME"
     info "Restarted ${SERVICE_NAME}."
   fi
 }
