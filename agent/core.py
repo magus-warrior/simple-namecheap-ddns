@@ -20,12 +20,20 @@ class DDNSRunner:
 
     def __init__(
         self,
-        config_path: str | Path = "config.enc.json",
-        db_path: str | Path = "agent.db",
+        config_path: str | Path | None = None,
+        db_path: str | Path | None = None,
         session: Optional[requests.Session] = None,
     ) -> None:
-        self._config_path = Path(config_path)
-        self._db = LogDB(str(db_path))
+        resolved_config_path = config_path or os.environ.get(
+            "AGENT_CONFIG_PATH",
+            "config.enc.json",
+        )
+        resolved_db_path = db_path or os.environ.get(
+            "AGENT_DB_PATH",
+            "agent.db",
+        )
+        self._config_path = Path(resolved_config_path)
+        self._db = LogDB(str(resolved_db_path))
         self._session = session or requests.Session()
         self._config: Optional[AgentConfig] = None
         self._crypto = CryptoManager(self._get_master_key())
