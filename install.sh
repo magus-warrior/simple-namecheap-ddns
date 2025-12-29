@@ -37,7 +37,11 @@ ensure_root() {
 
 find_python() {
   local python_bin
-  python_bin="$(which python3 2>/dev/null || true)"
+  if [[ "${EUID:-$(id -u)}" -eq 0 && -n "${SUDO_USER:-}" ]]; then
+    python_bin="$(sudo -u "$SUDO_USER" -H bash -lc 'command -v python3 || command -v python' 2>/dev/null || true)"
+  else
+    python_bin="$(which python3 2>/dev/null || true)"
+  fi
   if [[ -z "$python_bin" ]]; then
     python_bin="$(which python 2>/dev/null || true)"
   fi
@@ -200,7 +204,7 @@ verify_paths() {
 
   if [[ -f "$START_FILE" ]]; then
     local start_python
-    start_python="$(rg -n '^PYTHON_BIN=' "$START_FILE" | sed -E 's/^PYTHON_BIN="?(.*)"?$/\1/')"
+    start_python="$(sed -n -E 's/^PYTHON_BIN="?([^"]*)"?$/\1/p' "$START_FILE")"
     info "start.sh PYTHON_BIN: ${start_python:-"(not set)"}"
   else
     warn "Missing ${START_FILE}."
@@ -208,7 +212,7 @@ verify_paths() {
 
   if [[ -f "$REPO_SERVICE_FILE" ]]; then
     local repo_exec
-    repo_exec="$(rg -n '^ExecStart=' "$REPO_SERVICE_FILE" | sed -E 's/^ExecStart=//')"
+    repo_exec="$(sed -n -E 's/^ExecStart=//p' "$REPO_SERVICE_FILE")"
     info "Repo service ExecStart: ${repo_exec:-"(not set)"}"
   else
     warn "Missing ${REPO_SERVICE_FILE}."
@@ -216,7 +220,7 @@ verify_paths() {
 
   if [[ -f "$SYSTEMD_SERVICE_PATH" ]]; then
     local system_exec
-    system_exec="$(rg -n '^ExecStart=' "$SYSTEMD_SERVICE_PATH" | sed -E 's/^ExecStart=//')"
+    system_exec="$(sed -n -E 's/^ExecStart=//p' "$SYSTEMD_SERVICE_PATH")"
     info "Systemd ExecStart: ${system_exec:-"(not set)"}"
   else
     warn "Systemd service not installed at ${SYSTEMD_SERVICE_PATH}."
@@ -224,13 +228,13 @@ verify_paths() {
 
   if [[ -f "$AGENT_ENV_FILE" ]]; then
     local workdir
-    workdir="$(rg -n '^DDNS_WORKDIR=' "$AGENT_ENV_FILE" | sed -E 's/^DDNS_WORKDIR=//')"
+    workdir="$(sed -n -E 's/^DDNS_WORKDIR=//p' "$AGENT_ENV_FILE")"
     info "DDNS_WORKDIR: ${workdir:-"(not set)"}"
     if [[ -n "$workdir" && "$workdir" != "$REPO_ROOT" ]]; then
       warn "DDNS_WORKDIR does not match repo root (${REPO_ROOT})."
     fi
     local agent_key
-    agent_key="$(rg -n '^AGENT_MASTER_KEY=' "$AGENT_ENV_FILE" | sed -E 's/^AGENT_MASTER_KEY=//')"
+    agent_key="$(sed -n -E 's/^AGENT_MASTER_KEY=//p' "$AGENT_ENV_FILE")"
     if [[ -z "$agent_key" ]]; then
       warn "AGENT_MASTER_KEY missing in ${AGENT_ENV_FILE}."
     else
