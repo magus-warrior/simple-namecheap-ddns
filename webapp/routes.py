@@ -10,7 +10,13 @@ from flask import Blueprint, current_app, jsonify, render_template, request
 from shared_lib.security import CryptoManager
 from webapp.models import Secret, Target, db
 
-bp = Blueprint("webapp", __name__, template_folder="templates", static_folder="static")
+bp = Blueprint(
+    "webapp",
+    __name__,
+    template_folder="templates",
+    static_folder="static",
+    static_url_path="/static",
+)
 
 
 @bp.get("/")
