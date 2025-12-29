@@ -99,10 +99,8 @@ update_python_paths() {
     sed -i -E "s#^Environment=AGENT_DB_PATH=.*#Environment=AGENT_DB_PATH=${AGENT_DB_FILE}#" "$REPO_SERVICE_FILE"
     sed -i -E "s#^EnvironmentFile=.*#EnvironmentFile=${AGENT_ENV_FILE}#" "$REPO_SERVICE_FILE"
     sed -i -E "s#^WorkingDirectory=.*#WorkingDirectory=${REPO_ROOT}#" "$REPO_SERVICE_FILE"
-    sed -i -E "s#^ExecStart=.*#ExecStart=/bin/bash -lc 'exec \"${REPO_ROOT}/start-agent.sh\"'#" "$REPO_SERVICE_FILE"
+    sed -i -E "s#^ExecStart=.*#ExecStart=${REPO_ROOT}/start-agent.sh#" "$REPO_SERVICE_FILE"
     sed -i -E "s#^User=.*#User=${SERVICE_USER}#" "$REPO_SERVICE_FILE"
-    sed -i -E "s#^BindReadOnlyPaths=.*#BindReadOnlyPaths=${AGENT_CONFIG_FILE}#" "$REPO_SERVICE_FILE"
-    sed -i -E "s#^BindPaths=.*#BindPaths=${DATA_DIR}#" "$REPO_SERVICE_FILE"
     info "Updated ${REPO_SERVICE_FILE} service paths."
   else
     warn "Missing ${REPO_SERVICE_FILE}; cannot update ExecStart."

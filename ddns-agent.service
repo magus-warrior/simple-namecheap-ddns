@@ -5,19 +5,13 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=ddns-agent
+User=root
 Environment=AGENT_CONFIG_PATH=${DDNS_WORKDIR:-.}/.ddns/config.enc.json
 Environment=AGENT_DB_PATH=${DDNS_WORKDIR:-.}/.ddns/agent.db
 EnvironmentFile=${DDNS_WORKDIR:-.}/.ddns/agent.env
-StateDirectory=ddns-agent
-StateDirectoryMode=0750
 WorkingDirectory=${DDNS_WORKDIR:-.}
-ExecStart=/bin/bash -lc 'exec "${DDNS_WORKDIR:-.}/start-agent.sh"'
+ExecStart=./start-agent.sh
 Restart=on-failure
-ProtectSystem=strict
-ProtectHome=yes
-BindReadOnlyPaths=${DDNS_WORKDIR:-.}/.ddns/config.enc.json
-BindPaths=${DDNS_WORKDIR:-.}/.ddns
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 
 [Install]
