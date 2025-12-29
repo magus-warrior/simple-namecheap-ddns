@@ -97,6 +97,7 @@ update_python_paths() {
   if [[ -f "$REPO_SERVICE_FILE" ]]; then
     sed -i -E "s#^Environment=AGENT_CONFIG_PATH=.*#Environment=AGENT_CONFIG_PATH=${AGENT_CONFIG_FILE}#" "$REPO_SERVICE_FILE"
     sed -i -E "s#^Environment=AGENT_DB_PATH=.*#Environment=AGENT_DB_PATH=${AGENT_DB_FILE}#" "$REPO_SERVICE_FILE"
+    sed -i -E "s#^Environment=DDNS_PYTHON_BIN=.*#Environment=DDNS_PYTHON_BIN=${python_bin}#" "$REPO_SERVICE_FILE"
     sed -i -E "s#^EnvironmentFile=.*#EnvironmentFile=${AGENT_ENV_FILE}#" "$REPO_SERVICE_FILE"
     sed -i -E "s#^WorkingDirectory=.*#WorkingDirectory=${REPO_ROOT}#" "$REPO_SERVICE_FILE"
     sed -i -E "s#^ExecStart=.*#ExecStart=${REPO_ROOT}/start-agent.sh#" "$REPO_SERVICE_FILE"

@@ -9,6 +9,7 @@ User=root
 Environment=AGENT_CONFIG_PATH=${DDNS_WORKDIR:-.}/.ddns/config.enc.json
 Environment=AGENT_DB_PATH=${DDNS_WORKDIR:-.}/.ddns/agent.db
 EnvironmentFile=${DDNS_WORKDIR:-.}/.ddns/agent.env
+Environment=DDNS_PYTHON_BIN=python3
 WorkingDirectory=${DDNS_WORKDIR:-.}
 ExecStart=./start-agent.sh
 Restart=on-failure
