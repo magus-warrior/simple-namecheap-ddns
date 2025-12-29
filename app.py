@@ -5,10 +5,26 @@ from __future__ import annotations
 import os
 
 from flask import Flask
+from sqlalchemy import text
 
 from webapp import bp, db
 
 
+def _ensure_interval_minutes_column() -> None:
+    """Add interval_minutes to targets table if it's missing."""
+    with db.engine.begin() as connection:
+        result = connection.execute(text("PRAGMA table_info(targets)")).fetchall()
+        if not result:
+            return
+        columns = {row[1] for row in result}
+        if "interval_minutes" in columns:
+            return
+        connection.execute(
+            text(
+                "ALTER TABLE targets "
+                "ADD COLUMN interval_minutes INTEGER NOT NULL DEFAULT 5"
+            )
+        )
 def create_app() -> Flask:
     """Create and configure the Flask application."""
     app = Flask(__name__, static_folder=None)
@@ -25,6 +41,7 @@ def create_app() -> Flask:
 
     with app.app_context():
         db.create_all()
+        _ensure_interval_minutes_column()
 
     return app
 

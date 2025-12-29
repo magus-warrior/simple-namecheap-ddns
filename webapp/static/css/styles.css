@@ -407,11 +407,11 @@ code {
 }
 
 @media (max-width: 900px) {
-  .table-row {
-    grid-template-columns: 1fr;
+  .table {
+    overflow-x: auto;
   }
 
-  .table-row span {
-    display: block;
+  .table-row {
+    min-width: 560px;
   }
 }
