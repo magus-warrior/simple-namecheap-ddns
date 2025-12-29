@@ -12,6 +12,7 @@ EnvironmentFile=${DDNS_WORKDIR:-.}/.ddns/agent.env
 Environment=DDNS_PYTHON_BIN=python3
 WorkingDirectory=${DDNS_WORKDIR:-.}
 ExecStart=./start-agent.sh
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 
