@@ -10,7 +10,7 @@ Environment=AGENT_CONFIG_PATH=/etc/ddns-agent/config.enc.json
 Environment=AGENT_DB_PATH=/var/lib/ddns-agent/agent.db
 EnvironmentFile=/etc/ddns-agent/agent.env
 WorkingDirectory=/var/lib/ddns-agent
-ExecStart=/bin/bash -lc 'exec "${DDNS_WORKDIR:-/var/lib/ddns-agent}/start-agent.sh"'
+ExecStart=/var/lib/ddns-agent/start-agent.sh
 Restart=on-failure
 ProtectSystem=strict
 ProtectHome=yes
