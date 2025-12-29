@@ -38,11 +38,15 @@ class ConfigCompiler:
         self._service_name = service_name
         self._default_interval = default_interval
 
-    def _build_target(self, target: Target) -> AgentTarget:
+    def _split_hosts(self, hostnames: str) -> list[str]:
+        hosts = [host.strip() for host in hostnames.split(",")]
+        return [host for host in hosts if host]
+
+    def _build_target(self, target: Target, hostname: str) -> AgentTarget:
         secret_value = self._flask_crypto.decrypt_str(target.secret.encrypted_value)
         encrypted_token = self._agent_crypto.encrypt_str(secret_value)
         update_url = self._update_url_template.format(
-            hostname=target.host,
+            hostname=hostname,
             domain=target.domain,
             token="{token}",
             ip="{ip}",
@@ -50,7 +54,7 @@ class ConfigCompiler:
         )
         return AgentTarget(
             id=str(target.id),
-            hostname=target.host,
+            hostname=hostname,
             update_url=update_url,
             encrypted_token=encrypted_token,
             interval=self._default_interval,
@@ -58,9 +62,13 @@ class ConfigCompiler:
 
     def compile(self, targets: Iterable[Target]) -> AgentConfig:
         active_targets = [t for t in targets if t.is_enabled]
+        expanded_targets: list[AgentTarget] = []
+        for target in active_targets:
+            for hostname in self._split_hosts(target.host):
+                expanded_targets.append(self._build_target(target, hostname))
         return AgentConfig(
             check_ip_url=self._check_ip_url,
-            targets=[self._build_target(target) for target in active_targets],
+            targets=expanded_targets,
         )
 
     def publish(self, targets: Iterable[Target]) -> AgentConfig:
