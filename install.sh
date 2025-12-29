@@ -120,10 +120,15 @@ ensure_env_workdir() {
     ensure_root
   fi
 
+  local env_mode="0400"
+  if [[ "${DDNS_SYSTEM_WIDE:-}" == "1" ]]; then
+    env_mode="0440"
+  fi
+
   if [[ ! -f "${AGENT_ENV_FILE}" ]]; then
     if needs_root; then
       ${SUDO_BIN} install -d -m 0750 -o root -g root "${CONFIG_DIR}"
-      ${SUDO_BIN} install -m 0400 -o root -g root /dev/null "${AGENT_ENV_FILE}"
+      ${SUDO_BIN} install -m "${env_mode}" -o root -g root /dev/null "${AGENT_ENV_FILE}"
     else
       mkdir -p "${CONFIG_DIR}"
       install -m 0600 /dev/null "${AGENT_ENV_FILE}"
@@ -143,7 +148,7 @@ ensure_env_workdir() {
   ${SUDO_BIN} chmod 0600 "${AGENT_ENV_FILE}"
   ${SUDO_BIN} tee "${AGENT_ENV_FILE}" >/dev/null < "${temp_file}"
   rm -f "${temp_file}"
-  ${SUDO_BIN} chmod 0400 "${AGENT_ENV_FILE}"
+  ${SUDO_BIN} chmod "${env_mode}" "${AGENT_ENV_FILE}"
   info "Updated DDNS_WORKDIR in ${AGENT_ENV_FILE}."
 }
 
@@ -168,21 +173,21 @@ setup_permissions() {
         info "Created user ddns-agent."
       fi
 
-      ${SUDO_BIN} install -d -m 0750 -o root -g root "${CONFIG_DIR}"
+      ${SUDO_BIN} install -d -m 0750 -o ddns-admin -g ddns-agent "${CONFIG_DIR}"
       ${SUDO_BIN} install -d -m 0750 -o ddns-agent -g ddns-agent "${DATA_DIR}"
 
       if [[ ! -f "${AGENT_CONFIG_FILE}" ]]; then
-        ${SUDO_BIN} install -m 0400 -o ddns-agent -g ddns-agent /dev/null "${AGENT_CONFIG_FILE}"
+        ${SUDO_BIN} install -m 0640 -o ddns-admin -g ddns-agent /dev/null "${AGENT_CONFIG_FILE}"
       else
-        ${SUDO_BIN} chown ddns-agent:ddns-agent "${AGENT_CONFIG_FILE}"
-        ${SUDO_BIN} chmod 0400 "${AGENT_CONFIG_FILE}"
+        ${SUDO_BIN} chown ddns-admin:ddns-agent "${AGENT_CONFIG_FILE}"
+        ${SUDO_BIN} chmod 0640 "${AGENT_CONFIG_FILE}"
       fi
 
       if [[ ! -f "${AGENT_ENV_FILE}" ]]; then
-        ${SUDO_BIN} install -m 0400 -o root -g root /dev/null "${AGENT_ENV_FILE}"
+        ${SUDO_BIN} install -m 0440 -o ddns-admin -g ddns-agent /dev/null "${AGENT_ENV_FILE}"
       else
-        ${SUDO_BIN} chown root:root "${AGENT_ENV_FILE}"
-        ${SUDO_BIN} chmod 0400 "${AGENT_ENV_FILE}"
+        ${SUDO_BIN} chown ddns-admin:ddns-agent "${AGENT_ENV_FILE}"
+        ${SUDO_BIN} chmod 0440 "${AGENT_ENV_FILE}"
       fi
     else
       warn "DDNS_SYSTEM_WIDE not set; skipping system user and sudoers setup."
