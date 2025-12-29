@@ -45,7 +45,27 @@ class DDNSRunner:
         return key
 
     def load_config(self) -> AgentConfig:
-        data = json.loads(self._config_path.read_text(encoding="utf-8"))
+        try:
+            raw_payload = self._config_path.read_text(encoding="utf-8")
+        except FileNotFoundError as exc:
+            raise FileNotFoundError(
+                f"Agent config file not found at {self._config_path!s}. "
+                "Set AGENT_CONFIG_PATH or publish configuration from the web UI."
+            ) from exc
+
+        if not raw_payload.strip():
+            raise ValueError(
+                f"Agent config file {self._config_path!s} is empty. "
+                "Publish configuration from the web UI or replace the file with JSON."
+            )
+
+        try:
+            data = json.loads(raw_payload)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"Agent config file {self._config_path!s} is not valid JSON. "
+                "Re-publish configuration from the web UI or fix the file contents."
+            ) from exc
         if hasattr(AgentConfig, "model_validate"):
             config = AgentConfig.model_validate(data)
         else:
