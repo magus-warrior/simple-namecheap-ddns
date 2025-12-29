@@ -1,11 +1,12 @@
 const STATUS_PILL = document.getElementById("status-pill");
 const SECRETS_TABLE = document.getElementById("secrets-table");
-const SECRETS_EMPTY = document.getElementById("secrets-empty");
-const SECRET_EMPTY_ADD = document.getElementById("secret-empty-add");
+const SECRETS_LIST = document.getElementById("secrets-list");
+const SECRET_ADD_TOGGLE = document.getElementById("secret-add-toggle");
+const SECRET_DRAWER = document.getElementById("secret-drawer");
 const TARGETS_TABLE = document.getElementById("targets-table");
-const TARGETS_EMPTY = document.getElementById("targets-empty");
-const TARGET_EMPTY_ADD = document.getElementById("target-empty-add");
-const TARGETS_EMPTY_HELPER = document.getElementById("targets-empty-helper");
+const TARGETS_LIST = document.getElementById("targets-list");
+const TARGET_ADD_TOGGLE = document.getElementById("target-add-toggle");
+const TARGET_DRAWER = document.getElementById("target-drawer");
 const LOGS_TABLE = document.getElementById("logs-table");
 const LOGS_EMPTY = document.getElementById("logs-empty");
 const SECRETS_COUNT = document.getElementById("secrets-count");
@@ -39,6 +40,18 @@ const clearTableRows = (table) => {
   table.querySelectorAll(".table-row.data-row").forEach((row) => row.remove());
 };
 
+const toggleDrawer = (drawer, toggleButton, forceOpen) => {
+  const shouldOpen = forceOpen ?? drawer.hidden;
+  drawer.hidden = !shouldOpen;
+  toggleButton.setAttribute("aria-expanded", String(shouldOpen));
+};
+
+const ensureDrawerOpen = (drawer, toggleButton) => {
+  if (drawer.hidden) {
+    toggleDrawer(drawer, toggleButton, true);
+  }
+};
+
 const normalizeHosts = (hostValue) =>
   hostValue
     .split(",")
@@ -61,20 +74,31 @@ const renderSecrets = (secrets, targets) => {
   secretsCache.length = 0;
   secretsCache.push(...secrets);
   clearTableRows(SECRETS_TABLE);
+  SECRETS_LIST.innerHTML = "";
   if (!secrets.length) {
-    SECRETS_EMPTY.hidden = false;
     SECRETS_TABLE.hidden = true;
+    const emptyCard = document.createElement("div");
+    emptyCard.className = "list-card list-card-empty";
+    emptyCard.textContent = "No secrets configured yet.";
+    SECRETS_LIST.appendChild(emptyCard);
   } else {
-    SECRETS_EMPTY.hidden = true;
     SECRETS_TABLE.hidden = false;
     const usageCounts = targets.reduce((acc, target) => {
       acc[target.secret_id] = (acc[target.secret_id] ?? 0) + 1;
       return acc;
     }, {});
     secrets.forEach((secret) => {
+      const usageCount = usageCounts[secret.id] ?? 0;
+      const card = document.createElement("div");
+      card.className = "list-card";
+      card.innerHTML = `
+        <strong>${secret.name}</strong>
+        <span class="list-card-meta">${usageCount} target${usageCount === 1 ? "" : "s"}</span>
+      `;
+      SECRETS_LIST.appendChild(card);
+
       const row = document.createElement("div");
       row.className = "table-row data-row";
-      const usageCount = usageCounts[secret.id] ?? 0;
       row.innerHTML = `
         <span><strong>${secret.name}</strong></span>
         <span>—</span>
@@ -104,17 +128,28 @@ const renderSecrets = (secrets, targets) => {
 
 const renderTargets = (targets, secrets) => {
   clearTableRows(TARGETS_TABLE);
+  TARGETS_LIST.innerHTML = "";
   if (!targets.length) {
-    TARGETS_EMPTY.hidden = false;
     TARGETS_TABLE.hidden = true;
+    const emptyCard = document.createElement("div");
+    emptyCard.className = "list-card list-card-empty";
+    emptyCard.textContent = "No targets configured yet.";
+    TARGETS_LIST.appendChild(emptyCard);
   } else {
-    TARGETS_EMPTY.hidden = true;
     TARGETS_TABLE.hidden = false;
     const secretNames = secrets.reduce((acc, secret) => {
       acc[secret.id] = secret.name;
       return acc;
     }, {});
     targets.forEach((target) => {
+      const card = document.createElement("div");
+      card.className = "list-card";
+      card.innerHTML = `
+        <strong>${formatTargetLabel(target)}</strong>
+        <span class="list-card-meta">${target.is_enabled ? "Enabled" : "Disabled"}</span>
+      `;
+      TARGETS_LIST.appendChild(card);
+
       const row = document.createElement("div");
       row.className = "table-row data-row";
       row.innerHTML = `
@@ -232,8 +267,6 @@ const refreshSecretOptions = (secrets) => {
   });
   TARGET_SECRET.disabled = secrets.length === 0;
   TARGET_SUBMIT.disabled = secrets.length === 0;
-  TARGET_EMPTY_ADD.disabled = secrets.length === 0;
-  TARGETS_EMPTY_HELPER.hidden = secrets.length !== 0;
   TARGET_SECRET_HINT.hidden = secrets.length !== 0;
 };
 
@@ -242,6 +275,7 @@ const resetSecretForm = () => {
   SECRET_FORM.reset();
   SECRET_SUBMIT.textContent = "Add secret";
   SECRET_CANCEL.hidden = true;
+  toggleDrawer(SECRET_DRAWER, SECRET_ADD_TOGGLE, false);
 };
 
 const resetTargetForm = () => {
@@ -251,6 +285,7 @@ const resetTargetForm = () => {
   TARGET_INTERVAL.value = "5";
   TARGET_SUBMIT.textContent = "Add target";
   TARGET_CANCEL.hidden = true;
+  toggleDrawer(TARGET_DRAWER, TARGET_ADD_TOGGLE, false);
 };
 
 const startSecretEdit = (secret) => {
@@ -259,6 +294,7 @@ const startSecretEdit = (secret) => {
   SECRET_VALUE.value = "";
   SECRET_SUBMIT.textContent = "Update secret";
   SECRET_CANCEL.hidden = false;
+  ensureDrawerOpen(SECRET_DRAWER, SECRET_ADD_TOGGLE);
   SECRET_NAME.focus();
 };
 
@@ -268,6 +304,7 @@ const startSecretRotate = (secret) => {
   SECRET_VALUE.value = "";
   SECRET_SUBMIT.textContent = "Rotate secret";
   SECRET_CANCEL.hidden = false;
+  ensureDrawerOpen(SECRET_DRAWER, SECRET_ADD_TOGGLE);
   SECRET_VALUE.focus();
 };
 
@@ -280,6 +317,7 @@ const startTargetEdit = (target) => {
   TARGET_INTERVAL.value = String(target.interval_minutes ?? 5);
   TARGET_SUBMIT.textContent = "Update target";
   TARGET_CANCEL.hidden = false;
+  ensureDrawerOpen(TARGET_DRAWER, TARGET_ADD_TOGGLE);
   TARGET_HOST.focus();
 };
 
@@ -449,6 +487,16 @@ SECRET_CANCEL.addEventListener("click", () => {
   resetSecretForm();
 });
 
+SECRET_ADD_TOGGLE.addEventListener("click", () => {
+  if (editingSecretId) {
+    resetSecretForm();
+  }
+  toggleDrawer(SECRET_DRAWER, SECRET_ADD_TOGGLE);
+  if (!SECRET_DRAWER.hidden) {
+    SECRET_NAME.focus();
+  }
+});
+
 TARGET_FORM.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
@@ -469,12 +517,14 @@ TARGET_CANCEL.addEventListener("click", () => {
   resetTargetForm();
 });
 
-SECRET_EMPTY_ADD.addEventListener("click", () => {
-  SECRET_NAME.focus();
-});
-
-TARGET_EMPTY_ADD.addEventListener("click", () => {
-  TARGET_HOST.focus();
+TARGET_ADD_TOGGLE.addEventListener("click", () => {
+  if (editingTargetId) {
+    resetTargetForm();
+  }
+  toggleDrawer(TARGET_DRAWER, TARGET_ADD_TOGGLE);
+  if (!TARGET_DRAWER.hidden) {
+    TARGET_HOST.focus();
+  }
 });
 
 loadData();

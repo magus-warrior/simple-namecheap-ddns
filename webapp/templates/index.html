@@ -26,26 +26,36 @@
           <h2 id="secrets-title">Secrets</h2>
           <span class="badge" id="secrets-count">0</span>
         </div>
-        <form class="form" id="secret-form">
-          <div class="form-row">
-            <label>
-              Name
-              <input id="secret-name" name="name" type="text" placeholder="namecheap-token" required />
-            </label>
-            <label>
-              Token
-              <input id="secret-value" name="value" type="password" placeholder="API token" required />
-            </label>
-          </div>
-          <div class="form-actions">
-            <button type="submit" class="primary" id="secret-submit">Add secret</button>
-            <button type="button" class="ghost" id="secret-cancel" hidden>Cancel edit</button>
-          </div>
-          <p class="form-hint">Secrets are encrypted at rest and referenced by targets.</p>
-        </form>
-        <div class="empty-card" id="secrets-empty">
-          <p>No secrets configured yet.</p>
-          <button type="button" class="primary" id="secret-empty-add">Add secret</button>
+        <div class="list-row">
+          <div class="list-row-items" id="secrets-list" aria-live="polite"></div>
+          <button
+            type="button"
+            class="add-button"
+            id="secret-add-toggle"
+            aria-expanded="false"
+            aria-controls="secret-drawer"
+          >
+            + Add
+          </button>
+        </div>
+        <div class="add-drawer" id="secret-drawer" hidden>
+          <form class="form" id="secret-form">
+            <div class="form-row">
+              <label>
+                Name
+                <input id="secret-name" name="name" type="text" placeholder="namecheap-token" required />
+              </label>
+              <label>
+                Token
+                <input id="secret-value" name="value" type="password" placeholder="API token" required />
+              </label>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="primary" id="secret-submit">Add secret</button>
+              <button type="button" class="ghost" id="secret-cancel" hidden>Cancel edit</button>
+            </div>
+            <p class="form-hint">Secrets are encrypted at rest and referenced by targets.</p>
+          </form>
         </div>
         <div class="table secrets-table" id="secrets-table" hidden>
           <div class="table-row table-header">
@@ -62,55 +72,62 @@
           <h2 id="targets-title">Targets</h2>
           <span class="badge" id="targets-count">0</span>
         </div>
-        <form class="form" id="target-form">
-          <div class="form-row">
-            <label>
-              Hostname
-              <input id="target-host" name="host" type="text" placeholder="@, www" required />
-            </label>
-            <label>
-              Domain
-              <input id="target-domain" name="domain" type="text" placeholder="example.com" required />
-            </label>
-            <label>
-              Check every (minutes)
-              <input
-                id="target-interval"
-                name="interval_minutes"
-                type="number"
-                min="1"
-                step="1"
-                value="5"
-                required
-              />
-            </label>
-          </div>
-          <div class="form-row">
-            <label>
-              Secret
-              <select id="target-secret" name="secret_id" required></select>
-            </label>
-            <label class="checkbox">
-              <input id="target-enabled" name="is_enabled" type="checkbox" checked />
-              Enabled
-            </label>
-          </div>
-          <div class="form-actions">
-            <button type="submit" class="primary" id="target-submit">Add target</button>
-            <button type="button" class="ghost" id="target-cancel" hidden>Cancel edit</button>
-          </div>
-          <p class="form-hint" id="target-secret-hint" hidden>Add a secret first.</p>
-          <p class="form-hint">
-            Use <code>@</code> for the root domain. Separate multiple hostnames with commas to
-            update <code>example.com</code> and <code>www.example.com</code> together.
-          </p>
-        </form>
-        <div class="empty-card" id="targets-empty">
-          <p>No targets configured yet.</p>
-          <div class="empty-actions">
-            <button type="button" class="primary" id="target-empty-add">Add target</button>
-            <span class="helper-text" id="targets-empty-helper">Add a secret first.</span>
-          </div>
+        <div class="list-row">
+          <div class="list-row-items" id="targets-list" aria-live="polite"></div>
+          <button
+            type="button"
+            class="add-button"
+            id="target-add-toggle"
+            aria-expanded="false"
+            aria-controls="target-drawer"
+          >
+            + Add
+          </button>
+        </div>
+        <div class="add-drawer" id="target-drawer" hidden>
+          <form class="form" id="target-form">
+            <div class="form-row">
+              <label>
+                Hostname
+                <input id="target-host" name="host" type="text" placeholder="@, www" required />
+              </label>
+              <label>
+                Domain
+                <input id="target-domain" name="domain" type="text" placeholder="example.com" required />
+              </label>
+              <label>
+                Check every (minutes)
+                <input
+                  id="target-interval"
+                  name="interval_minutes"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value="5"
+                  required
+                />
+              </label>
+            </div>
+            <div class="form-row">
+              <label>
+                Secret
+                <select id="target-secret" name="secret_id" required></select>
+              </label>
+              <label class="checkbox">
+                <input id="target-enabled" name="is_enabled" type="checkbox" checked />
+                Enabled
+              </label>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="primary" id="target-submit">Add target</button>
+              <button type="button" class="ghost" id="target-cancel" hidden>Cancel edit</button>
+            </div>
+            <p class="form-hint" id="target-secret-hint" hidden>Add a secret first.</p>
+            <p class="form-hint">
+              Use <code>@</code> for the root domain. Separate multiple hostnames with commas to
+              update <code>example.com</code> and <code>www.example.com</code> together.
+            </p>
+          </form>
         </div>
         <div class="table targets-table" id="targets-table" hidden>
           <div class="table-row table-header">
