@@ -8,6 +8,19 @@ const TARGETS_TABLE = document.getElementById("targets-table");
 const TARGETS_LIST = document.getElementById("targets-list");
 const TARGET_ADD_TOGGLE = document.getElementById("target-add-toggle");
 const TARGET_ADD_HEADER = document.getElementById("target-add-header");
+
+const throwResponseError = async (response, fallbackMessage) => {
+  let message = fallbackMessage;
+  try {
+    const payload = await response.json();
+    if (payload && payload.error) {
+      message = payload.error;
+    }
+  } catch (error) {
+    // Ignore JSON parsing errors and use fallback message.
+  }
+  throw new Error(message);
+};
 const TARGET_DRAWER = document.getElementById("target-drawer");
 const LOGS_TABLE = document.getElementById("logs-table");
 const LOGS_EMPTY = document.getElementById("logs-empty");
@@ -271,6 +284,7 @@ const buildActionButton = (label, variant, onClick) => {
 };
 
 const refreshSecretOptions = (secrets) => {
+  const currentValue = TARGET_SECRET.value;
   TARGET_SECRET.innerHTML = "";
   const placeholder = document.createElement("option");
   placeholder.value = "";
@@ -284,6 +298,9 @@ const refreshSecretOptions = (secrets) => {
     option.textContent = `${secret.name} (ID ${secret.id})`;
     TARGET_SECRET.appendChild(option);
   });
+  if (currentValue && secrets.some((secret) => String(secret.id) === currentValue)) {
+    TARGET_SECRET.value = currentValue;
+  }
   TARGET_SECRET.disabled = secrets.length === 0;
   TARGET_SUBMIT.disabled = secrets.length === 0;
   TARGET_SECRET_HINT.hidden = secrets.length !== 0;
@@ -372,7 +389,7 @@ const createSecret = async () => {
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    throw new Error("Unable to create secret");
+    await throwResponseError(response, "Unable to create secret");
   }
 };
 
@@ -389,7 +406,7 @@ const updateSecret = async (secretId) => {
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    throw new Error("Unable to update secret");
+    await throwResponseError(response, "Unable to update secret");
   }
 };
 
@@ -422,7 +439,7 @@ const createTarget = async () => {
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    throw new Error("Unable to create target");
+    await throwResponseError(response, "Unable to create target");
   }
 };
 
@@ -440,7 +457,7 @@ const updateTarget = async (targetId) => {
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    throw new Error("Unable to update target");
+    await throwResponseError(response, "Unable to update target");
   }
 };
 
@@ -519,7 +536,7 @@ SECRET_FORM.addEventListener("submit", async (event) => {
     resetSecretForm();
     await loadData();
   } catch (error) {
-    setStatus("Secret save failed — check inputs", true);
+    setStatus(`Secret save failed — ${error.message || "check inputs"}`, true);
   }
 });
 
@@ -561,7 +578,7 @@ TARGET_FORM.addEventListener("submit", async (event) => {
     resetTargetForm();
     await loadData();
   } catch (error) {
-    setStatus("Target save failed — check inputs", true);
+    setStatus(`Target save failed — ${error.message || "check inputs"}`, true);
   }
 });
 
