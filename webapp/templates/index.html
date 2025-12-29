@@ -66,7 +66,7 @@
           <div class="form-row">
             <label>
               Hostname
-              <input id="target-host" name="host" type="text" placeholder="home" required />
+              <input id="target-host" name="host" type="text" placeholder="@, www" required />
             </label>
             <label>
               Domain
@@ -88,7 +88,10 @@
             <button type="button" class="ghost" id="target-cancel" hidden>Cancel edit</button>
           </div>
           <p class="form-hint" id="target-secret-hint" hidden>Add a secret first.</p>
-          <p class="form-hint">Targets define the hostnames the agent keeps updated.</p>
+          <p class="form-hint">
+            Use <code>@</code> for the root domain. Separate multiple hostnames with commas to
+            update <code>example.com</code> and <code>www.example.com</code> together.
+          </p>
         </form>
         <div class="empty-card" id="targets-empty">
           <p>No targets configured yet.</p>

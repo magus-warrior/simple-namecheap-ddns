@@ -49,6 +49,18 @@ def _target_to_dict(target: Target) -> dict[str, Any]:
     }
 
 
+def _normalize_hostnames(value: str) -> str:
+    hosts = [host.strip() for host in value.split(",")]
+    normalized: list[str] = []
+    seen = set()
+    for host in hosts:
+        if not host or host in seen:
+            continue
+        normalized.append(host)
+        seen.add(host)
+    return ", ".join(normalized)
+
+
 @bp.get("/secrets")
 def list_secrets() -> Any:
     secrets = Secret.query.order_by(Secret.name).all()
@@ -114,9 +126,12 @@ def create_target() -> Any:
     is_enabled = payload.get("is_enabled", True)
     if not host or not domain or not secret_id:
         return jsonify({"error": "host, domain, and secret_id are required"}), 400
+    normalized_host = _normalize_hostnames(host)
+    if not normalized_host:
+        return jsonify({"error": "host is required"}), 400
 
     target = Target(
-        host=host,
+        host=normalized_host,
         domain=domain,
         secret_id=secret_id,
         is_enabled=bool(is_enabled),
@@ -137,7 +152,10 @@ def update_target(target_id: int) -> Any:
     target = Target.query.get_or_404(target_id)
     payload = request.get_json(silent=True) or {}
     if "host" in payload:
-        target.host = payload.get("host")
+        normalized_host = _normalize_hostnames(payload.get("host") or "")
+        if not normalized_host:
+            return jsonify({"error": "host is required"}), 400
+        target.host = normalized_host
     if "domain" in payload:
         target.domain = payload.get("domain")
     if "secret_id" in payload:

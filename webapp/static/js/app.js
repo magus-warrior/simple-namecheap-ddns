@@ -38,9 +38,18 @@ const clearTableRows = (table) => {
   table.querySelectorAll(".table-row.data-row").forEach((row) => row.remove());
 };
 
+const normalizeHosts = (hostValue) =>
+  hostValue
+    .split(",")
+    .map((host) => host.trim())
+    .filter(Boolean);
+
 const formatTargetLabel = (target) => {
-  const host = target.host === "@" ? "root" : target.host;
-  return `${host}.${target.domain}`;
+  const hosts = normalizeHosts(target.host);
+  const formattedHosts = (hosts.length ? hosts : [target.host]).map((host) =>
+    host === "@" ? "root" : host
+  );
+  return `${formattedHosts.join(", ")}.${target.domain}`;
 };
 
 const formatTime = (timestamp) => {
