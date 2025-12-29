@@ -59,7 +59,7 @@ def _get_agent_key() -> str:
     raise RuntimeError("AGENT_MASTER_KEY is required to publish agent config")
 
 
-def _publish_config() -> None:
+def _publish_config() -> dict[str, Any] | None:
     compiler = ConfigCompiler(
         flask_key=_get_flask_key(),
         agent_key=_get_agent_key(),
@@ -81,15 +81,13 @@ def _publish_config() -> None:
         ]
         if service_name:
             hint_parts.append(f"Service: {service_name}.")
-        payload = {
+        return {
             "error": "Unable to publish agent configuration.",
             "detail": str(exc),
             "config_path": str(config_path) if config_path else None,
             "hint": " ".join(hint_parts),
         }
-        response = jsonify(payload)
-        response.status_code = 500
-        abort(response)
+    return None
 
 
 def _secret_to_dict(secret: Secret) -> dict[str, Any]:
@@ -179,8 +177,11 @@ def create_secret() -> Any:
     secret = Secret(name=name, encrypted_value=crypto.encrypt_str(value))
     db.session.add(secret)
     db.session.commit()
-    _publish_config()
-    return jsonify(_secret_to_dict(secret)), 201
+    publish_error = _publish_config()
+    payload = _secret_to_dict(secret)
+    if publish_error:
+        payload["publish_error"] = publish_error
+    return jsonify(payload), 201
 
 
 @bp.get("/secrets/<int:secret_id>")
@@ -201,8 +202,11 @@ def update_secret(secret_id: int) -> Any:
         crypto = _get_crypto()
         secret.encrypted_value = crypto.encrypt_str(value)
     db.session.commit()
-    _publish_config()
-    return jsonify(_secret_to_dict(secret))
+    publish_error = _publish_config()
+    payload = _secret_to_dict(secret)
+    if publish_error:
+        payload["publish_error"] = publish_error
+    return jsonify(payload)
 
 
 @bp.delete("/secrets/<int:secret_id>")
@@ -210,8 +214,11 @@ def delete_secret(secret_id: int) -> Any:
     secret = Secret.query.get_or_404(secret_id)
     db.session.delete(secret)
     db.session.commit()
-    _publish_config()
-    return jsonify({"status": "deleted"})
+    publish_error = _publish_config()
+    payload = {"status": "deleted"}
+    if publish_error:
+        payload["publish_error"] = publish_error
+    return jsonify(payload)
 
 
 @bp.get("/targets")
@@ -251,8 +258,11 @@ def create_target() -> Any:
     )
     db.session.add(target)
     db.session.commit()
-    _publish_config()
-    return jsonify(_target_to_dict(target)), 201
+    publish_error = _publish_config()
+    payload = _target_to_dict(target)
+    if publish_error:
+        payload["publish_error"] = publish_error
+    return jsonify(payload), 201
 
 
 @bp.get("/targets/<int:target_id>")
@@ -290,8 +300,11 @@ def update_target(target_id: int) -> Any:
             return jsonify({"error": "interval_minutes must be a positive integer"}), 400
         target.interval_minutes = interval_minutes
     db.session.commit()
-    _publish_config()
-    return jsonify(_target_to_dict(target))
+    publish_error = _publish_config()
+    payload = _target_to_dict(target)
+    if publish_error:
+        payload["publish_error"] = publish_error
+    return jsonify(payload)
 
 
 @bp.delete("/targets/<int:target_id>")
@@ -299,8 +312,11 @@ def delete_target(target_id: int) -> Any:
     target = Target.query.get_or_404(target_id)
     db.session.delete(target)
     db.session.commit()
-    _publish_config()
-    return jsonify({"status": "deleted"})
+    publish_error = _publish_config()
+    payload = {"status": "deleted"}
+    if publish_error:
+        payload["publish_error"] = publish_error
+    return jsonify(payload)
 
 
 @bp.post("/targets/<int:target_id>/force")

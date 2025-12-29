@@ -36,6 +36,35 @@ const throwResponseError = async (response, fallbackMessage) => {
   }
   throw new Error(message);
 };
+
+const readPublishError = async (response) => {
+  try {
+    const payload = await response.json();
+    return payload?.publish_error ?? null;
+  } catch (error) {
+    return null;
+  }
+};
+
+const formatPublishError = (publishError) => {
+  if (!publishError) {
+    return null;
+  }
+  const parts = [];
+  if (publishError.error) {
+    parts.push(publishError.error);
+  }
+  if (publishError.detail) {
+    parts.push(publishError.detail);
+  }
+  if (publishError.config_path) {
+    parts.push(`Config: ${publishError.config_path}`);
+  }
+  if (publishError.hint) {
+    parts.push(publishError.hint);
+  }
+  return parts.length ? parts.join(" • ") : "Config publish failed";
+};
 const TARGET_DRAWER = document.getElementById("target-drawer");
 const LOGS_TABLE = document.getElementById("logs-table");
 const LOGS_EMPTY = document.getElementById("logs-empty");
@@ -406,6 +435,7 @@ const createSecret = async () => {
   if (!response.ok) {
     await throwResponseError(response, "Unable to create secret");
   }
+  return readPublishError(response);
 };
 
 const updateSecret = async (secretId) => {
@@ -423,6 +453,7 @@ const updateSecret = async (secretId) => {
   if (!response.ok) {
     await throwResponseError(response, "Unable to update secret");
   }
+  return readPublishError(response);
 };
 
 const deleteSecret = async (secretId) => {
@@ -434,10 +465,14 @@ const deleteSecret = async (secretId) => {
     setStatus("Failed to delete secret", true);
     return;
   }
+  const publishError = await readPublishError(response);
   if (editingSecretId === secretId) {
     resetSecretForm();
   }
-  loadData();
+  await loadData();
+  if (publishError) {
+    setStatus(`Secret saved • ${formatPublishError(publishError)}`, true);
+  }
 };
 
 const createTarget = async () => {
@@ -456,6 +491,7 @@ const createTarget = async () => {
   if (!response.ok) {
     await throwResponseError(response, "Unable to create target");
   }
+  return readPublishError(response);
 };
 
 const updateTarget = async (targetId) => {
@@ -474,6 +510,7 @@ const updateTarget = async (targetId) => {
   if (!response.ok) {
     await throwResponseError(response, "Unable to update target");
   }
+  return readPublishError(response);
 };
 
 const setTargetEnabled = async (target, isEnabled) => {
@@ -507,10 +544,14 @@ const deleteTarget = async (targetId) => {
     setStatus("Failed to delete target", true);
     return;
   }
+  const publishError = await readPublishError(response);
   if (editingTargetId === targetId) {
     resetTargetForm();
   }
-  loadData();
+  await loadData();
+  if (publishError) {
+    setStatus(`Target saved • ${formatPublishError(publishError)}`, true);
+  }
 };
 
 const loadData = async () => {
@@ -543,13 +584,17 @@ SECRET_FORM.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
     setStatus(editingSecretId ? "Updating secret…" : "Creating secret…");
+    let publishError = null;
     if (editingSecretId) {
-      await updateSecret(editingSecretId);
+      publishError = await updateSecret(editingSecretId);
     } else {
-      await createSecret();
+      publishError = await createSecret();
     }
     resetSecretForm();
     await loadData();
+    if (publishError) {
+      setStatus(`Secret saved • ${formatPublishError(publishError)}`, true);
+    }
   } catch (error) {
     setStatus(`Secret save failed — ${error.message || "check inputs"}`, true);
   }
@@ -585,13 +630,17 @@ TARGET_FORM.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
     setStatus(editingTargetId ? "Updating target…" : "Creating target…");
+    let publishError = null;
     if (editingTargetId) {
-      await updateTarget(editingTargetId);
+      publishError = await updateTarget(editingTargetId);
     } else {
-      await createTarget();
+      publishError = await createTarget();
     }
     resetTargetForm();
     await loadData();
+    if (publishError) {
+      setStatus(`Target saved • ${formatPublishError(publishError)}`, true);
+    }
   } catch (error) {
     setStatus(`Target save failed — ${error.message || "check inputs"}`, true);
   }
