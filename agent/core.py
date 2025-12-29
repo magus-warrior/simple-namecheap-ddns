@@ -39,6 +39,7 @@ class DDNSRunner:
         self._db = LogDB(str(resolved_db_path))
         self._session = session or requests.Session()
         self._config: Optional[AgentConfig] = None
+        self._config_mtime: Optional[float] = None
         self._crypto = CryptoManager(self._get_master_key())
 
     def _get_master_key(self) -> str:
@@ -55,6 +56,7 @@ class DDNSRunner:
                 f"Agent config file not found at {self._config_path!s}. "
                 "Set AGENT_CONFIG_PATH or publish configuration from the web UI."
             ) from exc
+        self._config_mtime = self._config_path.stat().st_mtime
 
         if not raw_payload.strip():
             logging.warning(
@@ -78,6 +80,23 @@ class DDNSRunner:
             config = AgentConfig.parse_obj(data)
         self._config = config
         return config
+
+    def load_config_if_changed(self) -> bool:
+        try:
+            current_mtime = self._config_path.stat().st_mtime
+        except FileNotFoundError:
+            if self._config_mtime is not None:
+                logging.warning(
+                    "Agent config file %s is missing; keeping existing config.",
+                    self._config_path,
+                )
+                self._config_mtime = None
+            return False
+
+        if self._config_mtime is None or current_mtime != self._config_mtime:
+            self.load_config()
+            return True
+        return False
 
     def _get_config(self) -> AgentConfig:
         if self._config is None:

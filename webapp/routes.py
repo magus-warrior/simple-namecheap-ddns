@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import sqlite3
-import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -71,18 +70,15 @@ def _publish_config() -> dict[str, Any] | None:
     targets = Target.query.order_by(Target.id).all()
     try:
         compiler.publish(targets)
-    except (OSError, subprocess.CalledProcessError, RuntimeError) as exc:
+    except (OSError, RuntimeError) as exc:
         config_path = getattr(compiler, "_config_path", None)
-        service_name = getattr(compiler, "_service_name", None)
         current_app.logger.exception(
             "Failed to publish config to %s", config_path or "<unknown>"
         )
         hint_parts = [
             "Check file permissions for the config path.",
-            "Ensure the web process has privileges to run systemctl reload.",
+            "Ensure the agent process is running to pick up changes.",
         ]
-        if service_name:
-            hint_parts.append(f"Service: {service_name}.")
         return {
             "error": "Unable to publish agent configuration.",
             "detail": str(exc),

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import Iterable
@@ -95,7 +94,6 @@ class ConfigCompiler:
         else:
             payload = config.json(indent=2)
         self._write_atomic(payload)
-        self._reload_service()
         return config
 
     def _write_atomic(self, payload: str) -> None:
@@ -110,9 +108,3 @@ class ConfigCompiler:
             temp_name = handle.name
         os.chmod(temp_name, 0o600)
         os.replace(temp_name, self._config_path)
-
-    def _reload_service(self) -> None:
-        subprocess.run(
-            ["systemctl", "reload-or-restart", self._service_name],
-            check=True,
-        )

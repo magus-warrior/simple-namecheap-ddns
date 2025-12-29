@@ -42,6 +42,8 @@ def main() -> int:
                 runner.load_config()
                 reload_event.clear()
                 logging.info("Configuration reloaded.")
+            elif runner.load_config_if_changed():
+                logging.info("Configuration reloaded from disk.")
             runner.run_once()
             sleep_seconds = runner.get_sleep_seconds()
             stop_event.wait(timeout=sleep_seconds)
