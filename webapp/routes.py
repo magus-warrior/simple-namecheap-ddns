@@ -12,6 +12,7 @@ import requests
 
 from agent.database import LogDB, UpdateRecord
 from shared_lib.security import CryptoManager
+from webapp.publisher import ConfigCompiler
 from webapp.models import Secret, Target, db
 
 bp = Blueprint(
@@ -28,11 +29,44 @@ def index() -> str:
     return render_template("index.html")
 
 
-def _get_crypto() -> CryptoManager:
+def _get_flask_key() -> str:
     key = current_app.config.get("FLASK_MASTER_KEY")
     if not key:
         raise RuntimeError("FLASK_MASTER_KEY is required for encrypting secrets")
-    return CryptoManager(key)
+    return key
+
+
+def _get_crypto() -> CryptoManager:
+    return CryptoManager(_get_flask_key())
+
+
+def _get_agent_key() -> str:
+    key = os.environ.get("AGENT_MASTER_KEY")
+    if key:
+        return key
+
+    workdir = os.environ.get("DDNS_WORKDIR", ".")
+    env_path = Path(workdir) / ".ddns" / "agent.env"
+    if env_path.is_file():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            if not line or line.strip().startswith("#") or "=" not in line:
+                continue
+            name, value = line.split("=", 1)
+            if name.strip() == "AGENT_MASTER_KEY":
+                return value.strip()
+
+    raise RuntimeError("AGENT_MASTER_KEY is required to publish agent config")
+
+
+def _publish_config() -> None:
+    compiler = ConfigCompiler(
+        flask_key=_get_flask_key(),
+        agent_key=_get_agent_key(),
+        check_ip_url=os.environ.get("AGENT_CHECK_IP_URL", "https://api.ipify.org"),
+        update_url_template=_get_update_url_template(),
+    )
+    targets = Target.query.order_by(Target.id).all()
+    compiler.publish(targets)
 
 
 def _secret_to_dict(secret: Secret) -> dict[str, Any]:
@@ -122,6 +156,7 @@ def create_secret() -> Any:
     secret = Secret(name=name, encrypted_value=crypto.encrypt_str(value))
     db.session.add(secret)
     db.session.commit()
+    _publish_config()
     return jsonify(_secret_to_dict(secret)), 201
 
 
@@ -143,6 +178,7 @@ def update_secret(secret_id: int) -> Any:
         crypto = _get_crypto()
         secret.encrypted_value = crypto.encrypt_str(value)
     db.session.commit()
+    _publish_config()
     return jsonify(_secret_to_dict(secret))
 
 
@@ -151,6 +187,7 @@ def delete_secret(secret_id: int) -> Any:
     secret = Secret.query.get_or_404(secret_id)
     db.session.delete(secret)
     db.session.commit()
+    _publish_config()
     return jsonify({"status": "deleted"})
 
 
@@ -189,6 +226,7 @@ def create_target() -> Any:
     )
     db.session.add(target)
     db.session.commit()
+    _publish_config()
     return jsonify(_target_to_dict(target)), 201
 
 
@@ -219,6 +257,7 @@ def update_target(target_id: int) -> Any:
             return jsonify({"error": "interval_minutes must be a positive integer"}), 400
         target.interval_minutes = interval_minutes
     db.session.commit()
+    _publish_config()
     return jsonify(_target_to_dict(target))
 
 
@@ -227,6 +266,7 @@ def delete_target(target_id: int) -> Any:
     target = Target.query.get_or_404(target_id)
     db.session.delete(target)
     db.session.commit()
+    _publish_config()
     return jsonify({"status": "deleted"})
 
 

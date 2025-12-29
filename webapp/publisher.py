@@ -26,16 +26,26 @@ class ConfigCompiler:
             "https://dynamicdns.park-your-domain.com/update"
             "?host={hostname}&domain={domain}&password={token}&ip={ip}"
         ),
-        config_path: str | Path = "/etc/ddns-agent/config.enc.json",
-        service_name: str = "ddns-agent",
+        config_path: str | Path | None = None,
+        service_name: str | None = None,
         default_interval: int = 300,
     ) -> None:
+        resolved_config_path = config_path or os.environ.get("AGENT_CONFIG_PATH")
+        if resolved_config_path is None:
+            workdir = os.environ.get("DDNS_WORKDIR", ".")
+            resolved_config_path = str(
+                Path(workdir) / ".ddns" / "config.enc.json"
+            )
+        resolved_service_name = service_name or os.environ.get(
+            "AGENT_SERVICE_NAME",
+            "ddns-agent",
+        )
         self._flask_crypto = CryptoManager(flask_key)
         self._agent_crypto = CryptoManager(agent_key)
         self._check_ip_url = check_ip_url
         self._update_url_template = update_url_template
-        self._config_path = Path(config_path)
-        self._service_name = service_name
+        self._config_path = Path(resolved_config_path)
+        self._service_name = resolved_service_name
         self._default_interval = default_interval
 
     def _split_hosts(self, hostnames: str) -> list[str]:
