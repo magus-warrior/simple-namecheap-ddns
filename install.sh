@@ -267,6 +267,7 @@ install_service() {
   ensure_root
 
   ensure_env_workdir
+  update_python_paths
 
   if [[ ! -f "$REPO_SERVICE_FILE" ]]; then
     error "Missing ${REPO_SERVICE_FILE}."
