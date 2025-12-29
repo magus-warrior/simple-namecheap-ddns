@@ -56,7 +56,7 @@ update_python_paths() {
   python_bin="$(find_python)"
 
   if [[ -f "$REPO_SERVICE_FILE" ]]; then
-    sed -i -E "s#^ExecStart=.*#ExecStart=/var/lib/ddns-agent/start-agent.sh#" "$REPO_SERVICE_FILE"
+    sed -i -E "s#^ExecStart=.*#ExecStart=/bin/bash -lc 'exec \"\\${DDNS_WORKDIR:-/var/lib/ddns-agent}/start-agent.sh\"'#" "$REPO_SERVICE_FILE"
     info "Updated ${REPO_SERVICE_FILE} ExecStart."
   else
     warn "Missing ${REPO_SERVICE_FILE}; cannot update ExecStart."
