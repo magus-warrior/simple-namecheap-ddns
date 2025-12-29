@@ -2,10 +2,12 @@ const STATUS_PILL = document.getElementById("status-pill");
 const SECRETS_TABLE = document.getElementById("secrets-table");
 const SECRETS_LIST = document.getElementById("secrets-list");
 const SECRET_ADD_TOGGLE = document.getElementById("secret-add-toggle");
+const SECRET_ADD_HEADER = document.getElementById("secret-add-header");
 const SECRET_DRAWER = document.getElementById("secret-drawer");
 const TARGETS_TABLE = document.getElementById("targets-table");
 const TARGETS_LIST = document.getElementById("targets-list");
 const TARGET_ADD_TOGGLE = document.getElementById("target-add-toggle");
+const TARGET_ADD_HEADER = document.getElementById("target-add-header");
 const TARGET_DRAWER = document.getElementById("target-drawer");
 const LOGS_TABLE = document.getElementById("logs-table");
 const LOGS_EMPTY = document.getElementById("logs-empty");
@@ -26,6 +28,10 @@ const TARGET_INTERVAL = document.getElementById("target-interval");
 const TARGET_SUBMIT = document.getElementById("target-submit");
 const TARGET_CANCEL = document.getElementById("target-cancel");
 const TARGET_SECRET_HINT = document.getElementById("target-secret-hint");
+const TAB_SECRETS = document.getElementById("tab-secrets");
+const TAB_TARGETS = document.getElementById("tab-targets");
+const PANEL_SECRETS = document.getElementById("panel-secrets");
+const PANEL_TARGETS = document.getElementById("panel-targets");
 
 const secretsCache = [];
 let editingSecretId = null;
@@ -36,19 +42,32 @@ const setStatus = (text, isError = false) => {
   STATUS_PILL.style.borderColor = isError ? "rgba(255, 103, 242, 0.9)" : "rgba(103, 250, 255, 0.6)";
 };
 
+const setActiveTab = (tab) => {
+  const isSecrets = tab === "secrets";
+  TAB_SECRETS.classList.toggle("is-active", isSecrets);
+  TAB_TARGETS.classList.toggle("is-active", !isSecrets);
+  TAB_SECRETS.setAttribute("aria-selected", String(isSecrets));
+  TAB_TARGETS.setAttribute("aria-selected", String(!isSecrets));
+  PANEL_SECRETS.hidden = !isSecrets;
+  PANEL_TARGETS.hidden = isSecrets;
+  PANEL_SECRETS.classList.toggle("is-active", isSecrets);
+  PANEL_TARGETS.classList.toggle("is-active", !isSecrets);
+};
+
 const clearTableRows = (table) => {
   table.querySelectorAll(".table-row.data-row").forEach((row) => row.remove());
 };
 
-const toggleDrawer = (drawer, toggleButton, forceOpen) => {
+const toggleDrawer = (drawer, toggleButtons, forceOpen) => {
+  const buttons = Array.isArray(toggleButtons) ? toggleButtons : [toggleButtons];
   const shouldOpen = forceOpen ?? drawer.hidden;
   drawer.hidden = !shouldOpen;
-  toggleButton.setAttribute("aria-expanded", String(shouldOpen));
+  buttons.forEach((button) => button?.setAttribute("aria-expanded", String(shouldOpen)));
 };
 
-const ensureDrawerOpen = (drawer, toggleButton) => {
+const ensureDrawerOpen = (drawer, toggleButtons) => {
   if (drawer.hidden) {
-    toggleDrawer(drawer, toggleButton, true);
+    toggleDrawer(drawer, toggleButtons, true);
   }
 };
 
@@ -275,7 +294,7 @@ const resetSecretForm = () => {
   SECRET_FORM.reset();
   SECRET_SUBMIT.textContent = "Add secret";
   SECRET_CANCEL.hidden = true;
-  toggleDrawer(SECRET_DRAWER, SECRET_ADD_TOGGLE, false);
+  toggleDrawer(SECRET_DRAWER, [SECRET_ADD_TOGGLE, SECRET_ADD_HEADER], false);
 };
 
 const resetTargetForm = () => {
@@ -285,7 +304,7 @@ const resetTargetForm = () => {
   TARGET_INTERVAL.value = "5";
   TARGET_SUBMIT.textContent = "Add target";
   TARGET_CANCEL.hidden = true;
-  toggleDrawer(TARGET_DRAWER, TARGET_ADD_TOGGLE, false);
+  toggleDrawer(TARGET_DRAWER, [TARGET_ADD_TOGGLE, TARGET_ADD_HEADER], false);
 };
 
 const startSecretEdit = (secret) => {
@@ -294,7 +313,8 @@ const startSecretEdit = (secret) => {
   SECRET_VALUE.value = "";
   SECRET_SUBMIT.textContent = "Update secret";
   SECRET_CANCEL.hidden = false;
-  ensureDrawerOpen(SECRET_DRAWER, SECRET_ADD_TOGGLE);
+  setActiveTab("secrets");
+  ensureDrawerOpen(SECRET_DRAWER, [SECRET_ADD_TOGGLE, SECRET_ADD_HEADER]);
   SECRET_NAME.focus();
 };
 
@@ -304,7 +324,8 @@ const startSecretRotate = (secret) => {
   SECRET_VALUE.value = "";
   SECRET_SUBMIT.textContent = "Rotate secret";
   SECRET_CANCEL.hidden = false;
-  ensureDrawerOpen(SECRET_DRAWER, SECRET_ADD_TOGGLE);
+  setActiveTab("secrets");
+  ensureDrawerOpen(SECRET_DRAWER, [SECRET_ADD_TOGGLE, SECRET_ADD_HEADER]);
   SECRET_VALUE.focus();
 };
 
@@ -317,7 +338,26 @@ const startTargetEdit = (target) => {
   TARGET_INTERVAL.value = String(target.interval_minutes ?? 5);
   TARGET_SUBMIT.textContent = "Update target";
   TARGET_CANCEL.hidden = false;
-  ensureDrawerOpen(TARGET_DRAWER, TARGET_ADD_TOGGLE);
+  setActiveTab("targets");
+  ensureDrawerOpen(TARGET_DRAWER, [TARGET_ADD_TOGGLE, TARGET_ADD_HEADER]);
+  TARGET_HOST.focus();
+};
+
+const openSecretAddDrawer = () => {
+  if (editingSecretId) {
+    resetSecretForm();
+  }
+  setActiveTab("secrets");
+  ensureDrawerOpen(SECRET_DRAWER, [SECRET_ADD_TOGGLE, SECRET_ADD_HEADER]);
+  SECRET_NAME.focus();
+};
+
+const openTargetAddDrawer = () => {
+  if (editingTargetId) {
+    resetTargetForm();
+  }
+  setActiveTab("targets");
+  ensureDrawerOpen(TARGET_DRAWER, [TARGET_ADD_TOGGLE, TARGET_ADD_HEADER]);
   TARGET_HOST.focus();
 };
 
@@ -491,10 +531,22 @@ SECRET_ADD_TOGGLE.addEventListener("click", () => {
   if (editingSecretId) {
     resetSecretForm();
   }
-  toggleDrawer(SECRET_DRAWER, SECRET_ADD_TOGGLE);
+  toggleDrawer(SECRET_DRAWER, [SECRET_ADD_TOGGLE, SECRET_ADD_HEADER]);
   if (!SECRET_DRAWER.hidden) {
     SECRET_NAME.focus();
   }
+});
+
+SECRET_ADD_HEADER.addEventListener("click", () => {
+  openSecretAddDrawer();
+});
+
+TAB_SECRETS.addEventListener("click", () => {
+  setActiveTab("secrets");
+});
+
+TAB_TARGETS.addEventListener("click", () => {
+  setActiveTab("targets");
 });
 
 TARGET_FORM.addEventListener("submit", async (event) => {
@@ -521,10 +573,14 @@ TARGET_ADD_TOGGLE.addEventListener("click", () => {
   if (editingTargetId) {
     resetTargetForm();
   }
-  toggleDrawer(TARGET_DRAWER, TARGET_ADD_TOGGLE);
+  toggleDrawer(TARGET_DRAWER, [TARGET_ADD_TOGGLE, TARGET_ADD_HEADER]);
   if (!TARGET_DRAWER.hidden) {
     TARGET_HOST.focus();
   }
+});
+
+TARGET_ADD_HEADER.addEventListener("click", () => {
+  openTargetAddDrawer();
 });
 
 loadData();
