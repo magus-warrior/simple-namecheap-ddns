@@ -113,6 +113,21 @@ setup_permissions() {
     chmod 0400 "${env_file}"
   fi
 
+  if ! grep -q '^AGENT_MASTER_KEY=' "${env_file}"; then
+    chmod 0600 "${env_file}"
+    local agent_key
+    agent_key="$(python3 - <<'PY'
+import base64
+import os
+
+print(base64.urlsafe_b64encode(os.urandom(32)).decode("utf-8"))
+PY
+)"
+    echo "AGENT_MASTER_KEY=${agent_key}" >> "${env_file}"
+    chmod 0400 "${env_file}"
+    info "Generated AGENT_MASTER_KEY in ${env_file}."
+  fi
+
   if [[ ! -f "${flask_db_path}" ]]; then
     install -m 0640 -o ddns-admin -g ddns-admin /dev/null "${flask_db_path}"
   else
@@ -213,6 +228,13 @@ verify_paths() {
     info "DDNS_WORKDIR: ${workdir:-"(not set)"}"
     if [[ -n "$workdir" && "$workdir" != "$REPO_ROOT" ]]; then
       warn "DDNS_WORKDIR does not match repo root (${REPO_ROOT})."
+    fi
+    local agent_key
+    agent_key="$(rg -n '^AGENT_MASTER_KEY=' "$AGENT_ENV_FILE" | sed -E 's/^AGENT_MASTER_KEY=//')"
+    if [[ -z "$agent_key" ]]; then
+      warn "AGENT_MASTER_KEY missing in ${AGENT_ENV_FILE}."
+    else
+      info "AGENT_MASTER_KEY: (set)"
     fi
   else
     warn "Missing ${AGENT_ENV_FILE}."
