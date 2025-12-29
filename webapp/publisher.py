@@ -90,10 +90,10 @@ class ConfigCompiler:
 
     def publish(self, targets: Iterable[Target]) -> AgentConfig:
         config = self.compile(targets)
-        payload = json.dumps(
-            config.model_dump() if hasattr(config, "model_dump") else config.dict(),
-            indent=2,
-        )
+        if hasattr(config, "model_dump"):
+            payload = json.dumps(config.model_dump(mode="json"), indent=2)
+        else:
+            payload = config.json(indent=2)
         self._write_atomic(payload)
         self._reload_service()
         return config
