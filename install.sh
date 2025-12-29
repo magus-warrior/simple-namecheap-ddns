@@ -34,6 +34,13 @@ error() {
   echo "$(color 31 "[ERROR]") $*" >&2
 }
 
+confirm() {
+  local prompt="$1"
+  local response
+  read -r -p "${prompt} [y/N]: " response
+  [[ "${response,,}" == "y" ]]
+}
+
 ensure_root() {
   if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
     if command -v sudo >/dev/null 2>&1; then
@@ -392,6 +399,55 @@ update_repo() {
   info "Repository updated."
 }
 
+guided_install() {
+  info "Starting guided first-time install."
+  update_python_paths
+  install_dependencies
+  setup_permissions
+  install_service
+  verify_paths
+  info "Guided install complete."
+}
+
+full_reinstall() {
+  warn "Full reinstall will stop the service, remove systemd unit, and delete config/data."
+  if ! confirm "Proceed with full reinstall"; then
+    info "Full reinstall canceled."
+    return 0
+  fi
+
+  if needs_root || [[ -d "$SYSTEMD_DIR" ]]; then
+    ensure_root
+  fi
+
+  if command -v systemctl >/dev/null 2>&1; then
+    if ${SUDO_BIN} systemctl is-enabled --quiet "$SERVICE_NAME" 2>/dev/null; then
+      ${SUDO_BIN} systemctl disable "$SERVICE_NAME" || true
+    fi
+    if ${SUDO_BIN} systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+      ${SUDO_BIN} systemctl stop "$SERVICE_NAME" || true
+    fi
+  fi
+
+  if [[ -f "$SYSTEMD_SERVICE_PATH" ]]; then
+    ${SUDO_BIN} rm -f "$SYSTEMD_SERVICE_PATH"
+    ${SUDO_BIN} systemctl daemon-reload || true
+    info "Removed systemd service ${SYSTEMD_SERVICE_PATH}."
+  fi
+
+  if [[ -d "$CONFIG_DIR" ]]; then
+    ${SUDO_BIN} rm -rf "$CONFIG_DIR"
+    info "Removed config directory ${CONFIG_DIR}."
+  fi
+
+  if [[ -d "$DATA_DIR" ]]; then
+    ${SUDO_BIN} rm -rf "$DATA_DIR"
+    info "Removed data directory ${DATA_DIR}."
+  fi
+
+  guided_install
+}
+
 print_menu() {
   cat <<'EOF'
 Simple Namecheap DDNS Installer
@@ -402,6 +458,8 @@ Simple Namecheap DDNS Installer
 4) Configure system users and permissions (root)
 5) Install/update systemd service (root)
 6) Update repository (git pull)
+7) Guided install (first time)
+8) Full reinstall (wipe config/data)
 q) Quit
 EOF
 }
@@ -428,6 +486,12 @@ main() {
         ;;
       6)
         update_repo
+        ;;
+      7)
+        guided_install
+        ;;
+      8)
+        full_reinstall
         ;;
       q)
         info "Exiting installer."
