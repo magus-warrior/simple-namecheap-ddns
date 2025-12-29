@@ -6,8 +6,10 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=ddns-agent
+Environment=AGENT_CONFIG_PATH=/etc/ddns-agent/config.enc.json
+Environment=AGENT_DB_PATH=/var/lib/ddns-agent/agent.db
 EnvironmentFile=/etc/ddns-agent/agent.env
-WorkingDirectory=${DDNS_WORKDIR}
+WorkingDirectory=/var/lib/ddns-agent
 ExecStart=/usr/bin/python3 -m agent.main
 Restart=on-failure
 ProtectSystem=strict
