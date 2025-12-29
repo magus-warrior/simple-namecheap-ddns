@@ -74,6 +74,30 @@ update_python_paths() {
   fi
 }
 
+ensure_env_workdir() {
+  ensure_root
+
+  if [[ ! -f "${AGENT_ENV_FILE}" ]]; then
+    warn "Missing ${AGENT_ENV_FILE}; cannot update DDNS_WORKDIR."
+    return 0
+  fi
+
+  local temp_file
+  temp_file="$(mktemp)"
+  awk -v workdir="DDNS_WORKDIR=${REPO_ROOT}" '
+    BEGIN { found = 0 }
+    /^DDNS_WORKDIR=/ { print workdir; found = 1; next }
+    { print }
+    END { if (!found) print workdir }
+  ' "${AGENT_ENV_FILE}" > "${temp_file}"
+
+  chmod 0600 "${AGENT_ENV_FILE}"
+  cat "${temp_file}" > "${AGENT_ENV_FILE}"
+  rm -f "${temp_file}"
+  chmod 0400 "${AGENT_ENV_FILE}"
+  info "Updated DDNS_WORKDIR in ${AGENT_ENV_FILE}."
+}
+
 setup_permissions() {
   ensure_root
 
@@ -111,11 +135,7 @@ setup_permissions() {
     chmod 0400 "${env_file}"
   fi
 
-  if ! grep -q '^DDNS_WORKDIR=' "${env_file}"; then
-    chmod 0600 "${env_file}"
-    echo "DDNS_WORKDIR=${REPO_ROOT}" >> "${env_file}"
-    chmod 0400 "${env_file}"
-  fi
+  ensure_env_workdir
 
   if ! grep -q '^AGENT_MASTER_KEY=' "${env_file}"; then
     chmod 0600 "${env_file}"
@@ -148,6 +168,8 @@ EOF
 
 install_service() {
   ensure_root
+
+  ensure_env_workdir
 
   if [[ ! -f "$REPO_SERVICE_FILE" ]]; then
     error "Missing ${REPO_SERVICE_FILE}."
