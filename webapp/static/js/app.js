@@ -21,6 +21,7 @@ const TARGET_HOST = document.getElementById("target-host");
 const TARGET_DOMAIN = document.getElementById("target-domain");
 const TARGET_SECRET = document.getElementById("target-secret");
 const TARGET_ENABLED = document.getElementById("target-enabled");
+const TARGET_INTERVAL = document.getElementById("target-interval");
 const TARGET_SUBMIT = document.getElementById("target-submit");
 const TARGET_CANCEL = document.getElementById("target-cancel");
 const TARGET_SECRET_HINT = document.getElementById("target-secret-hint");
@@ -120,6 +121,7 @@ const renderTargets = (targets, secrets) => {
         <span><strong>${formatTargetLabel(target)}</strong></span>
         <span>${target.is_enabled ? "Yes" : "No"}</span>
         <span>${secretNames[target.secret_id] ?? `Secret #${target.secret_id}`}</span>
+        <span>${target.interval_minutes} min</span>
         <span class="table-actions"></span>
       `;
       const actionsCell = row.querySelector(".table-actions");
@@ -246,6 +248,7 @@ const resetTargetForm = () => {
   editingTargetId = null;
   TARGET_FORM.reset();
   TARGET_ENABLED.checked = true;
+  TARGET_INTERVAL.value = "5";
   TARGET_SUBMIT.textContent = "Add target";
   TARGET_CANCEL.hidden = true;
 };
@@ -274,6 +277,7 @@ const startTargetEdit = (target) => {
   TARGET_DOMAIN.value = target.domain;
   TARGET_SECRET.value = String(target.secret_id);
   TARGET_ENABLED.checked = Boolean(target.is_enabled);
+  TARGET_INTERVAL.value = String(target.interval_minutes ?? 5);
   TARGET_SUBMIT.textContent = "Update target";
   TARGET_CANCEL.hidden = false;
   TARGET_HOST.focus();
@@ -332,6 +336,7 @@ const createTarget = async () => {
     domain: TARGET_DOMAIN.value.trim(),
     secret_id: Number(TARGET_SECRET.value),
     is_enabled: TARGET_ENABLED.checked,
+    interval_minutes: Number(TARGET_INTERVAL.value),
   };
   const response = await fetch("/targets", {
     method: "POST",
@@ -349,6 +354,7 @@ const updateTarget = async (targetId) => {
     domain: TARGET_DOMAIN.value.trim(),
     secret_id: Number(TARGET_SECRET.value),
     is_enabled: TARGET_ENABLED.checked,
+    interval_minutes: Number(TARGET_INTERVAL.value),
   };
   const response = await fetch(`/targets/${targetId}`, {
     method: "PUT",
