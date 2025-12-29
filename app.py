@@ -11,7 +11,7 @@ from webapp import bp, db
 
 def create_app() -> Flask:
     """Create and configure the Flask application."""
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder=None)
     db_path = os.environ.get("WEBAPP_DB_PATH", "webapp.db")
     app.config.update(
         SQLALCHEMY_DATABASE_URI=f"sqlite:///{db_path}",
