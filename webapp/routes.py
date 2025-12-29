@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 from typing import Any
 
 from flask import Blueprint, current_app, jsonify, render_template, request
@@ -160,7 +161,14 @@ def dashboard() -> Any:
     db_path = current_app.config.get("AGENT_DB_PATH", "agent.db")
     limit = int(request.args.get("limit", 25))
     rows: list[dict[str, Any]] = []
-    connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    if not Path(db_path).is_file():
+        current_app.logger.warning("Agent DB not found at %s", db_path)
+        return jsonify({"logs": rows})
+    try:
+        connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    except sqlite3.OperationalError:
+        current_app.logger.exception("Unable to open agent DB at %s", db_path)
+        return jsonify({"logs": rows})
     connection.row_factory = sqlite3.Row
     try:
         cursor = connection.execute(
