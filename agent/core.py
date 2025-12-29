@@ -54,10 +54,13 @@ class DDNSRunner:
             ) from exc
 
         if not raw_payload.strip():
-            raise ValueError(
-                f"Agent config file {self._config_path!s} is empty. "
-                "Publish configuration from the web UI or replace the file with JSON."
+            logging.warning(
+                "Agent config file %s is empty; waiting for configuration publish.",
+                self._config_path,
             )
+            check_ip_url = os.environ.get("AGENT_CHECK_IP_URL", "https://api.ipify.org")
+            self._config = AgentConfig(check_ip_url=check_ip_url, targets=[])
+            return self._config
 
         try:
             data = json.loads(raw_payload)
@@ -108,6 +111,9 @@ class DDNSRunner:
 
     def run_once(self) -> None:
         config = self._get_config()
+        if not config.targets:
+            logging.info("No DDNS targets configured; skipping update cycle.")
+            return
         current_ip = self._fetch_public_ip(config)
         cached_ip = self._db.get_cache("last_ip")
         if current_ip and cached_ip == current_ip:
