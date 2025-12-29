@@ -13,8 +13,23 @@ const throwResponseError = async (response, fallbackMessage) => {
   let message = fallbackMessage;
   try {
     const payload = await response.json();
-    if (payload && payload.error) {
-      message = payload.error;
+    if (payload) {
+      const parts = [];
+      if (payload.error) {
+        parts.push(payload.error);
+      }
+      if (payload.detail) {
+        parts.push(payload.detail);
+      }
+      if (payload.config_path) {
+        parts.push(`Config: ${payload.config_path}`);
+      }
+      if (payload.hint) {
+        parts.push(payload.hint);
+      }
+      if (parts.length) {
+        message = parts.join(" • ");
+      }
     }
   } catch (error) {
     // Ignore JSON parsing errors and use fallback message.

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import subprocess
 from pathlib import Path
 from typing import Any
 
-from flask import Blueprint, current_app, jsonify, render_template, request
+from flask import Blueprint, abort, current_app, jsonify, render_template, request
 import requests
 
 from agent.database import LogDB, UpdateRecord
@@ -66,7 +67,29 @@ def _publish_config() -> None:
         update_url_template=_get_update_url_template(),
     )
     targets = Target.query.order_by(Target.id).all()
-    compiler.publish(targets)
+    try:
+        compiler.publish(targets)
+    except (OSError, subprocess.CalledProcessError, RuntimeError) as exc:
+        config_path = getattr(compiler, "_config_path", None)
+        service_name = getattr(compiler, "_service_name", None)
+        current_app.logger.exception(
+            "Failed to publish config to %s", config_path or "<unknown>"
+        )
+        hint_parts = [
+            "Check file permissions for the config path.",
+            "Ensure the web process has privileges to run systemctl reload.",
+        ]
+        if service_name:
+            hint_parts.append(f"Service: {service_name}.")
+        payload = {
+            "error": "Unable to publish agent configuration.",
+            "detail": str(exc),
+            "config_path": str(config_path) if config_path else None,
+            "hint": " ".join(hint_parts),
+        }
+        response = jsonify(payload)
+        response.status_code = 500
+        abort(response)
 
 
 def _secret_to_dict(secret: Secret) -> dict[str, Any]:
