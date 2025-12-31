@@ -24,16 +24,17 @@ class DDNSRunner:
         db_path: str | Path | None = None,
         session: Optional[requests.Session] = None,
     ) -> None:
+        workdir = os.environ.get("DDNS_WORKDIR", ".")
         resolved_config_path = config_path or os.environ.get("AGENT_CONFIG_PATH")
         if resolved_config_path is None:
             # Keep agent defaults in sync with webapp ConfigCompiler.
-            workdir = os.environ.get("DDNS_WORKDIR", ".")
             resolved_config_path = str(
                 Path(workdir) / ".ddns" / "config.enc.json"
             )
+        default_db_path = str(Path(workdir) / ".ddns" / "agent.db")
         resolved_db_path = db_path or os.environ.get(
             "AGENT_DB_PATH",
-            "agent.db",
+            default_db_path,
         )
         self._config_path = Path(resolved_config_path)
         self._db = LogDB(str(resolved_db_path))

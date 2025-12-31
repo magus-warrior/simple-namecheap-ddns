@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from flask import Flask
 from sqlalchemy import text
@@ -29,11 +30,15 @@ def create_app() -> Flask:
     """Create and configure the Flask application."""
     app = Flask(__name__, static_folder=None)
     db_path = os.environ.get("WEBAPP_DB_PATH", "webapp.db")
+    workdir = os.environ.get("DDNS_WORKDIR", ".")
+    default_agent_db_path = str(
+        Path(workdir) / ".ddns" / "agent.db"
+    )
     app.config.update(
         SQLALCHEMY_DATABASE_URI=f"sqlite:///{db_path}",
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         FLASK_MASTER_KEY=os.environ.get("FLASK_MASTER_KEY"),
-        AGENT_DB_PATH=os.environ.get("AGENT_DB_PATH", "agent.db"),
+        AGENT_DB_PATH=os.environ.get("AGENT_DB_PATH", default_agent_db_path),
     )
 
     db.init_app(app)
