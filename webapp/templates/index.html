@@ -45,6 +45,16 @@
             >
               Targets
             </button>
+            <button
+              type="button"
+              class="tab-button"
+              id="tab-logs"
+              role="tab"
+              aria-selected="false"
+              aria-controls="panel-logs"
+            >
+              Recent updates
+            </button>
           </div>
         </div>
 
@@ -239,23 +249,25 @@
             </div>
           </div>
         </div>
-      </section>
 
-      <section class="panel logs" aria-labelledby="logs-title">
-        <div class="panel-header">
-          <h2 id="logs-title">Recent Updates (Agent)</h2>
-          <span class="badge" id="logs-count">0</span>
-        </div>
-        <div class="table" id="logs-table">
-          <div class="table-row table-header">
-            <span>Target</span>
-            <span>Result</span>
-            <span>IP</span>
-            <span>ErrCount</span>
-            <span>Error</span>
-            <span>Timestamp</span>
+        <div class="tab-panel" id="panel-logs" role="tabpanel" aria-labelledby="tab-logs" hidden>
+          <div class="tab-panel-header">
+            <div class="tab-panel-title">
+              <h3 id="logs-title">Recent Updates (Agent)</h3>
+              <span class="badge" id="logs-count">0</span>
+            </div>
           </div>
-          <div class="table-row empty" id="logs-empty">No logs available.</div>
+          <div class="table" id="logs-table">
+            <div class="table-row table-header">
+              <span>Target</span>
+              <span>Result</span>
+              <span>IP</span>
+              <span>ErrCount</span>
+              <span>Error</span>
+              <span>Timestamp</span>
+            </div>
+            <div class="table-row empty" id="logs-empty">No logs available.</div>
+          </div>
         </div>
       </section>
     </main>

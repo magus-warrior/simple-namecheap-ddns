@@ -96,8 +96,10 @@ const TARGET_SECRET_SUBMIT = document.getElementById("target-secret-submit");
 const TARGET_SECRET_CANCEL = document.getElementById("target-secret-cancel");
 const TAB_SECRETS = document.getElementById("tab-secrets");
 const TAB_TARGETS = document.getElementById("tab-targets");
+const TAB_LOGS = document.getElementById("tab-logs");
 const PANEL_SECRETS = document.getElementById("panel-secrets");
 const PANEL_TARGETS = document.getElementById("panel-targets");
+const PANEL_LOGS = document.getElementById("panel-logs");
 
 const secretsCache = [];
 let editingSecretId = null;
@@ -110,14 +112,20 @@ const setStatus = (text, isError = false) => {
 
 const setActiveTab = (tab) => {
   const isSecrets = tab === "secrets";
+  const isTargets = tab === "targets";
+  const isLogs = tab === "logs";
   TAB_SECRETS.classList.toggle("is-active", isSecrets);
-  TAB_TARGETS.classList.toggle("is-active", !isSecrets);
+  TAB_TARGETS.classList.toggle("is-active", isTargets);
+  TAB_LOGS.classList.toggle("is-active", isLogs);
   TAB_SECRETS.setAttribute("aria-selected", String(isSecrets));
-  TAB_TARGETS.setAttribute("aria-selected", String(!isSecrets));
+  TAB_TARGETS.setAttribute("aria-selected", String(isTargets));
+  TAB_LOGS.setAttribute("aria-selected", String(isLogs));
   PANEL_SECRETS.hidden = !isSecrets;
-  PANEL_TARGETS.hidden = isSecrets;
+  PANEL_TARGETS.hidden = !isTargets;
+  PANEL_LOGS.hidden = !isLogs;
   PANEL_SECRETS.classList.toggle("is-active", isSecrets);
-  PANEL_TARGETS.classList.toggle("is-active", !isSecrets);
+  PANEL_TARGETS.classList.toggle("is-active", isTargets);
+  PANEL_LOGS.classList.toggle("is-active", isLogs);
 };
 
 const clearTableRows = (table) => {
@@ -673,6 +681,10 @@ TAB_SECRETS.addEventListener("click", () => {
 
 TAB_TARGETS.addEventListener("click", () => {
   setActiveTab("targets");
+});
+
+TAB_LOGS.addEventListener("click", () => {
+  setActiveTab("logs");
 });
 
 TARGET_FORM.addEventListener("submit", async (event) => {
