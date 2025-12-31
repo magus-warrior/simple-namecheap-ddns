@@ -412,9 +412,19 @@ h1 {
 
 .table-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   align-items: center;
+}
+
+.table-actions .button,
+.table-actions button.primary,
+.table-actions button.ghost,
+.table-actions button.danger {
+  padding: 6px 10px;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: none;
 }
 
 .mask {
