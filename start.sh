@@ -5,6 +5,9 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KEY_FILE="$REPO_ROOT/.flask_master_key"
 PYTHON_BIN="python"
 
+export DDNS_WORKDIR="${DDNS_WORKDIR:-$REPO_ROOT}"
+export AGENT_DB_PATH="${AGENT_DB_PATH:-$DDNS_WORKDIR/.ddns/agent.db}"
+
 if [[ -z "${FLASK_MASTER_KEY:-}" ]]; then
   if [[ -f "$KEY_FILE" ]]; then
     export FLASK_MASTER_KEY
