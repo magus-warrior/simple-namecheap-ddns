@@ -468,6 +468,29 @@ h1 {
   color: var(--muted);
 }
 
+.label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.inline-action {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0;
+}
+
+.inline-action:hover {
+  color: var(--accent-2);
+}
+
 .form input,
 .form select {
   padding: 10px 12px;
@@ -548,6 +571,54 @@ button.danger {
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 10;
+}
+
+.modal[hidden] {
+  display: none;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 3, 14, 0.7);
+  backdrop-filter: blur(6px);
+}
+
+.modal-content {
+  position: relative;
+  width: min(560px, 92vw);
+  background: rgba(8, 6, 18, 0.95);
+  border-radius: 18px;
+  border: 1px solid rgba(103, 250, 255, 0.35);
+  padding: 20px;
+  z-index: 1;
+  box-shadow: 0 0 32px rgba(103, 250, 255, 0.2);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.modal-header h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.modal-close {
+  font-size: 0.7rem;
+  padding: 6px 12px;
 }
 
 footer {

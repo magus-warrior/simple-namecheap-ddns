@@ -85,6 +85,15 @@ const TARGET_INTERVAL = document.getElementById("target-interval");
 const TARGET_SUBMIT = document.getElementById("target-submit");
 const TARGET_CANCEL = document.getElementById("target-cancel");
 const TARGET_SECRET_HINT = document.getElementById("target-secret-hint");
+const TARGET_SECRET_ADD = document.getElementById("target-secret-add");
+const TARGET_SECRET_MODAL = document.getElementById("target-secret-modal");
+const TARGET_SECRET_BACKDROP = document.getElementById("target-secret-backdrop");
+const TARGET_SECRET_CLOSE = document.getElementById("target-secret-close");
+const TARGET_SECRET_FORM = document.getElementById("target-secret-form");
+const TARGET_SECRET_NAME = document.getElementById("target-secret-name");
+const TARGET_SECRET_VALUE = document.getElementById("target-secret-value");
+const TARGET_SECRET_SUBMIT = document.getElementById("target-secret-submit");
+const TARGET_SECRET_CANCEL = document.getElementById("target-secret-cancel");
 const TAB_SECRETS = document.getElementById("tab-secrets");
 const TAB_TARGETS = document.getElementById("tab-targets");
 const PANEL_SECRETS = document.getElementById("panel-secrets");
@@ -126,6 +135,11 @@ const ensureDrawerOpen = (drawer, toggleButtons) => {
   if (drawer.hidden) {
     toggleDrawer(drawer, toggleButtons, true);
   }
+};
+
+const toggleModal = (modal, forceOpen) => {
+  const shouldOpen = forceOpen ?? modal.hidden;
+  modal.hidden = !shouldOpen;
 };
 
 const normalizeHosts = (hostValue) =>
@@ -368,6 +382,21 @@ const resetTargetForm = () => {
   toggleDrawer(TARGET_DRAWER, [TARGET_ADD_TOGGLE, TARGET_ADD_HEADER], false);
 };
 
+const resetTargetSecretForm = () => {
+  TARGET_SECRET_FORM.reset();
+  TARGET_SECRET_SUBMIT.disabled = false;
+};
+
+const closeTargetSecretModal = () => {
+  toggleModal(TARGET_SECRET_MODAL, false);
+  resetTargetSecretForm();
+};
+
+const openTargetSecretModal = () => {
+  toggleModal(TARGET_SECRET_MODAL, true);
+  TARGET_SECRET_NAME.focus();
+};
+
 const startSecretEdit = (secret) => {
   editingSecretId = secret.id;
   SECRET_NAME.value = secret.name;
@@ -436,6 +465,26 @@ const createSecret = async () => {
     await throwResponseError(response, "Unable to create secret");
   }
   return readPublishError(response);
+};
+
+const createSecretFromTarget = async () => {
+  const payload = {
+    name: TARGET_SECRET_NAME.value.trim(),
+    value: TARGET_SECRET_VALUE.value.trim(),
+  };
+  const response = await fetch("/secrets", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    await throwResponseError(response, "Unable to create secret");
+  }
+  const secretPayload = await response.json();
+  return {
+    secret: secretPayload,
+    publishError: secretPayload?.publish_error ?? null,
+  };
 };
 
 const updateSecret = async (secretId) => {
@@ -662,6 +711,44 @@ TARGET_ADD_TOGGLE.addEventListener("click", () => {
 
 TARGET_ADD_HEADER.addEventListener("click", () => {
   openTargetAddDrawer();
+});
+
+TARGET_SECRET_ADD.addEventListener("click", () => {
+  openTargetSecretModal();
+});
+
+TARGET_SECRET_CLOSE.addEventListener("click", () => {
+  closeTargetSecretModal();
+});
+
+TARGET_SECRET_CANCEL.addEventListener("click", () => {
+  closeTargetSecretModal();
+});
+
+TARGET_SECRET_BACKDROP.addEventListener("click", () => {
+  closeTargetSecretModal();
+});
+
+TARGET_SECRET_FORM.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    TARGET_SECRET_SUBMIT.disabled = true;
+    setStatus("Creating secret…");
+    const { secret, publishError } = await createSecretFromTarget();
+    await loadData();
+    if (secret?.id) {
+      TARGET_SECRET.value = String(secret.id);
+    }
+    if (publishError) {
+      setStatus(`Secret saved • ${formatPublishError(publishError)}`, true);
+    } else {
+      setStatus("Secret added to targets.");
+    }
+    closeTargetSecretModal();
+  } catch (error) {
+    TARGET_SECRET_SUBMIT.disabled = false;
+    setStatus(`Secret save failed — ${error.message || "check inputs"}`, true);
+  }
 });
 
 loadData();

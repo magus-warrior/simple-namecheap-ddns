@@ -166,7 +166,12 @@
               </div>
               <div class="form-row">
                 <label>
-                  Secret
+                  <span class="label-row">
+                    <span>Secret</span>
+                    <button type="button" class="inline-action" id="target-secret-add">
+                      + Add secret
+                    </button>
+                  </span>
                   <select id="target-secret" name="secret_id" required></select>
                 </label>
                 <label class="checkbox">
@@ -184,6 +189,45 @@
                 update <code>example.com</code> and <code>www.example.com</code> together.
               </p>
             </form>
+          </div>
+          <div class="modal" id="target-secret-modal" hidden>
+            <div class="modal-backdrop" id="target-secret-backdrop"></div>
+            <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="target-secret-title">
+              <div class="modal-header">
+                <h4 id="target-secret-title">Add secret</h4>
+                <button type="button" class="ghost modal-close" id="target-secret-close">Close</button>
+              </div>
+              <form class="form" id="target-secret-form">
+                <div class="form-row">
+                  <label>
+                    Name
+                    <input
+                      id="target-secret-name"
+                      name="name"
+                      type="text"
+                      placeholder="namecheap-token"
+                      required
+                    />
+                  </label>
+                  <label>
+                    Token
+                    <input
+                      id="target-secret-value"
+                      name="value"
+                      type="password"
+                      placeholder="API token"
+                      autocomplete="current-password"
+                      required
+                    />
+                  </label>
+                </div>
+                <div class="form-actions">
+                  <button type="submit" class="primary" id="target-secret-submit">Add secret</button>
+                  <button type="button" class="ghost" id="target-secret-cancel">Cancel</button>
+                </div>
+                <p class="form-hint">Secrets are encrypted at rest and referenced by targets.</p>
+              </form>
+            </div>
           </div>
           <div class="table targets-table" id="targets-table" hidden>
             <div class="table-row table-header">
