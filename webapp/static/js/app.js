@@ -1,12 +1,10 @@
 const STATUS_PILL = document.getElementById("status-pill");
 const SECRETS_TABLE = document.getElementById("secrets-table");
 const SECRETS_LIST = document.getElementById("secrets-list");
-const SECRET_ADD_TOGGLE = document.getElementById("secret-add-toggle");
 const SECRET_ADD_HEADER = document.getElementById("secret-add-header");
 const SECRET_DRAWER = document.getElementById("secret-drawer");
 const TARGETS_TABLE = document.getElementById("targets-table");
 const TARGETS_LIST = document.getElementById("targets-list");
-const TARGET_ADD_TOGGLE = document.getElementById("target-add-toggle");
 const TARGET_ADD_HEADER = document.getElementById("target-add-header");
 
 const throwResponseError = async (response, fallbackMessage) => {
@@ -377,7 +375,7 @@ const resetSecretForm = () => {
   SECRET_FORM.reset();
   SECRET_SUBMIT.textContent = "Add secret";
   SECRET_CANCEL.hidden = true;
-  toggleDrawer(SECRET_DRAWER, [SECRET_ADD_TOGGLE, SECRET_ADD_HEADER], false);
+  toggleDrawer(SECRET_DRAWER, SECRET_ADD_HEADER, false);
 };
 
 const resetTargetForm = () => {
@@ -387,7 +385,7 @@ const resetTargetForm = () => {
   TARGET_INTERVAL.value = "5";
   TARGET_SUBMIT.textContent = "Add target";
   TARGET_CANCEL.hidden = true;
-  toggleDrawer(TARGET_DRAWER, [TARGET_ADD_TOGGLE, TARGET_ADD_HEADER], false);
+  toggleDrawer(TARGET_DRAWER, TARGET_ADD_HEADER, false);
 };
 
 const resetTargetSecretForm = () => {
@@ -412,7 +410,7 @@ const startSecretEdit = (secret) => {
   SECRET_SUBMIT.textContent = "Update secret";
   SECRET_CANCEL.hidden = false;
   setActiveTab("secrets");
-  ensureDrawerOpen(SECRET_DRAWER, [SECRET_ADD_TOGGLE, SECRET_ADD_HEADER]);
+  ensureDrawerOpen(SECRET_DRAWER, SECRET_ADD_HEADER);
   SECRET_NAME.focus();
 };
 
@@ -423,7 +421,7 @@ const startSecretRotate = (secret) => {
   SECRET_SUBMIT.textContent = "Rotate secret";
   SECRET_CANCEL.hidden = false;
   setActiveTab("secrets");
-  ensureDrawerOpen(SECRET_DRAWER, [SECRET_ADD_TOGGLE, SECRET_ADD_HEADER]);
+  ensureDrawerOpen(SECRET_DRAWER, SECRET_ADD_HEADER);
   SECRET_VALUE.focus();
 };
 
@@ -437,7 +435,7 @@ const startTargetEdit = (target) => {
   TARGET_SUBMIT.textContent = "Update target";
   TARGET_CANCEL.hidden = false;
   setActiveTab("targets");
-  ensureDrawerOpen(TARGET_DRAWER, [TARGET_ADD_TOGGLE, TARGET_ADD_HEADER]);
+  ensureDrawerOpen(TARGET_DRAWER, TARGET_ADD_HEADER);
   TARGET_HOST.focus();
 };
 
@@ -446,7 +444,7 @@ const openSecretAddDrawer = () => {
     resetSecretForm();
   }
   setActiveTab("secrets");
-  ensureDrawerOpen(SECRET_DRAWER, [SECRET_ADD_TOGGLE, SECRET_ADD_HEADER]);
+  ensureDrawerOpen(SECRET_DRAWER, SECRET_ADD_HEADER);
   SECRET_NAME.focus();
 };
 
@@ -455,7 +453,7 @@ const openTargetAddDrawer = () => {
     resetTargetForm();
   }
   setActiveTab("targets");
-  ensureDrawerOpen(TARGET_DRAWER, [TARGET_ADD_TOGGLE, TARGET_ADD_HEADER]);
+  ensureDrawerOpen(TARGET_DRAWER, TARGET_ADD_HEADER);
   TARGET_HOST.focus();
 };
 
@@ -661,18 +659,14 @@ SECRET_CANCEL.addEventListener("click", () => {
   resetSecretForm();
 });
 
-SECRET_ADD_TOGGLE.addEventListener("click", () => {
+SECRET_ADD_HEADER.addEventListener("click", () => {
   if (editingSecretId) {
     resetSecretForm();
   }
-  toggleDrawer(SECRET_DRAWER, [SECRET_ADD_TOGGLE, SECRET_ADD_HEADER]);
+  toggleDrawer(SECRET_DRAWER, SECRET_ADD_HEADER);
   if (!SECRET_DRAWER.hidden) {
     SECRET_NAME.focus();
   }
-});
-
-SECRET_ADD_HEADER.addEventListener("click", () => {
-  openSecretAddDrawer();
 });
 
 TAB_SECRETS.addEventListener("click", () => {
@@ -711,18 +705,14 @@ TARGET_CANCEL.addEventListener("click", () => {
   resetTargetForm();
 });
 
-TARGET_ADD_TOGGLE.addEventListener("click", () => {
+TARGET_ADD_HEADER.addEventListener("click", () => {
   if (editingTargetId) {
     resetTargetForm();
   }
-  toggleDrawer(TARGET_DRAWER, [TARGET_ADD_TOGGLE, TARGET_ADD_HEADER]);
+  toggleDrawer(TARGET_DRAWER, TARGET_ADD_HEADER);
   if (!TARGET_DRAWER.hidden) {
     TARGET_HOST.focus();
   }
-});
-
-TARGET_ADD_HEADER.addEventListener("click", () => {
-  openTargetAddDrawer();
 });
 
 TARGET_SECRET_ADD.addEventListener("click", () => {
