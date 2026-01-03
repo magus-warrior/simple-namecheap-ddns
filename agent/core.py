@@ -139,14 +139,25 @@ class DDNSRunner:
             return
         current_ip = self._fetch_public_ip(config)
         cached_ip = self._db.get_cache("last_ip")
-        if current_ip and cached_ip == current_ip:
-            logging.info("Public IP unchanged; skipping update cycle.")
-            return
+        skip_unchanged_ip = current_ip and cached_ip == current_ip
+        if skip_unchanged_ip:
+            logging.info(
+                "Public IP unchanged; checking for targets that still need updates."
+            )
 
         if current_ip:
             self._db.set_cache("last_ip", current_ip)
 
         for target in config.targets:
+            if skip_unchanged_ip and current_ip:
+                target_cache_key = f"last_ip:{target.id}"
+                target_last_ip = self._db.get_cache(target_cache_key)
+                if target_last_ip == current_ip:
+                    logging.info(
+                        "Skipping %s; already updated for current IP.",
+                        target.hostname,
+                    )
+                    continue
             token: Optional[str] = None
             try:
                 token = self._crypto.decrypt_str(target.encrypted_token)
@@ -169,6 +180,8 @@ class DDNSRunner:
                         ip_address=current_ip,
                     )
                 )
+                if current_ip:
+                    self._db.set_cache(f"last_ip:{target.id}", current_ip)
                 logging.info("Updated %s: %s", target.hostname, message)
             except requests.RequestException as exc:
                 self._db.log_update(
