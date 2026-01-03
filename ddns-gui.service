@@ -1,0 +1,20 @@
+[Unit]
+Description=DDNS Web UI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Environment=DDNS_WORKDIR=${DDNS_WORKDIR:-.}
+Environment=AGENT_CONFIG_PATH=${DDNS_WORKDIR:-.}/.ddns/config.enc.json
+Environment=AGENT_DB_PATH=${DDNS_WORKDIR:-.}/.ddns/agent.db
+EnvironmentFile=${DDNS_WORKDIR:-.}/.ddns/agent.env
+WorkingDirectory=${DDNS_WORKDIR:-.}
+ExecStart=./start.sh
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target
