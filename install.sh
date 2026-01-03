@@ -3,9 +3,12 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_NAME="ddns-agent.service"
+GUI_SERVICE_NAME="ddns-gui.service"
 SYSTEMD_DIR="/etc/systemd/system"
 SYSTEMD_SERVICE_PATH="${SYSTEMD_DIR}/${SERVICE_NAME}"
+GUI_SYSTEMD_SERVICE_PATH="${SYSTEMD_DIR}/${GUI_SERVICE_NAME}"
 REPO_SERVICE_FILE="${REPO_ROOT}/${SERVICE_NAME}"
+GUI_REPO_SERVICE_FILE="${REPO_ROOT}/${GUI_SERVICE_NAME}"
 START_FILE="${REPO_ROOT}/start.sh"
 REQUIREMENTS_FILE="${REPO_ROOT}/requirements.txt"
 CONFIG_DIR="${DDNS_CONFIG_DIR:-${REPO_ROOT}/.ddns}"
@@ -112,6 +115,19 @@ update_python_paths() {
     info "Updated ${REPO_SERVICE_FILE} service paths."
   else
     warn "Missing ${REPO_SERVICE_FILE}; cannot update ExecStart."
+  fi
+
+  if [[ -f "$GUI_REPO_SERVICE_FILE" ]]; then
+    sed -i -E "s#^Environment=DDNS_WORKDIR=.*#Environment=DDNS_WORKDIR=${REPO_ROOT}#" "$GUI_REPO_SERVICE_FILE"
+    sed -i -E "s#^Environment=AGENT_CONFIG_PATH=.*#Environment=AGENT_CONFIG_PATH=${AGENT_CONFIG_FILE}#" "$GUI_REPO_SERVICE_FILE"
+    sed -i -E "s#^Environment=AGENT_DB_PATH=.*#Environment=AGENT_DB_PATH=${AGENT_DB_FILE}#" "$GUI_REPO_SERVICE_FILE"
+    sed -i -E "s#^EnvironmentFile=.*#EnvironmentFile=${AGENT_ENV_FILE}#" "$GUI_REPO_SERVICE_FILE"
+    sed -i -E "s#^WorkingDirectory=.*#WorkingDirectory=${REPO_ROOT}#" "$GUI_REPO_SERVICE_FILE"
+    sed -i -E "s#^ExecStart=.*#ExecStart=${REPO_ROOT}/start.sh#" "$GUI_REPO_SERVICE_FILE"
+    sed -i -E "s#^User=.*#User=${SERVICE_USER}#" "$GUI_REPO_SERVICE_FILE"
+    info "Updated ${GUI_REPO_SERVICE_FILE} service paths."
+  else
+    warn "Missing ${GUI_REPO_SERVICE_FILE}; cannot update ExecStart."
   fi
 
   if [[ -f "$START_FILE" ]]; then
@@ -282,29 +298,46 @@ install_service() {
   ensure_env_workdir
   update_python_paths
 
-  if [[ ! -f "$REPO_SERVICE_FILE" ]]; then
-    error "Missing ${REPO_SERVICE_FILE}."
-    return 1
-  fi
+  local missing_service=0
 
-  ${SUDO_BIN} install -m 0644 "$REPO_SERVICE_FILE" "$SYSTEMD_SERVICE_PATH"
-  ${SUDO_BIN} systemctl daemon-reload
-  info "Installed ${SERVICE_NAME} to ${SYSTEMD_SERVICE_PATH}."
+  install_service_file() {
+    local service_name="$1"
+    local repo_service_file="$2"
+    local systemd_service_path="$3"
 
-  if ${SUDO_BIN} systemctl is-enabled --quiet "$SERVICE_NAME"; then
-    info "${SERVICE_NAME} is already enabled."
-  else
-    read -r -p "Enable ${SERVICE_NAME} on boot? [y/N]: " enable_choice
-    if [[ "${enable_choice,,}" == "y" ]]; then
-      ${SUDO_BIN} systemctl enable "$SERVICE_NAME"
-      info "Enabled ${SERVICE_NAME}."
+    if [[ ! -f "$repo_service_file" ]]; then
+      warn "Missing ${repo_service_file}."
+      missing_service=1
+      return 0
     fi
-  fi
 
-  read -r -p "Start/restart ${SERVICE_NAME} now? [y/N]: " start_choice
-  if [[ "${start_choice,,}" == "y" ]]; then
-    ${SUDO_BIN} systemctl restart "$SERVICE_NAME"
-    info "Restarted ${SERVICE_NAME}."
+    ${SUDO_BIN} install -m 0644 "$repo_service_file" "$systemd_service_path"
+    ${SUDO_BIN} systemctl daemon-reload
+    info "Installed ${service_name} to ${systemd_service_path}."
+
+    if ${SUDO_BIN} systemctl is-enabled --quiet "$service_name"; then
+      info "${service_name} is already enabled."
+    else
+      read -r -p "Enable ${service_name} on boot? [y/N]: " enable_choice
+      if [[ "${enable_choice,,}" == "y" ]]; then
+        ${SUDO_BIN} systemctl enable "$service_name"
+        info "Enabled ${service_name}."
+      fi
+    fi
+
+    read -r -p "Start/restart ${service_name} now? [y/N]: " start_choice
+    if [[ "${start_choice,,}" == "y" ]]; then
+      ${SUDO_BIN} systemctl restart "$service_name"
+      info "Restarted ${service_name}."
+    fi
+  }
+
+  install_service_file "$SERVICE_NAME" "$REPO_SERVICE_FILE" "$SYSTEMD_SERVICE_PATH"
+  install_service_file "$GUI_SERVICE_NAME" "$GUI_REPO_SERVICE_FILE" "$GUI_SYSTEMD_SERVICE_PATH"
+
+  if [[ "$missing_service" -ne 0 ]]; then
+    error "One or more service files are missing."
+    return 1
   fi
 }
 
@@ -357,6 +390,22 @@ verify_paths() {
     info "Systemd ExecStart: ${system_exec:-"(not set)"}"
   else
     warn "Systemd service not installed at ${SYSTEMD_SERVICE_PATH}."
+  fi
+
+  if [[ -f "$GUI_REPO_SERVICE_FILE" ]]; then
+    local gui_repo_exec
+    gui_repo_exec="$(sed -n -E 's/^ExecStart=//p' "$GUI_REPO_SERVICE_FILE")"
+    info "GUI repo service ExecStart: ${gui_repo_exec:-"(not set)"}"
+  else
+    warn "Missing ${GUI_REPO_SERVICE_FILE}."
+  fi
+
+  if [[ -f "$GUI_SYSTEMD_SERVICE_PATH" ]]; then
+    local gui_system_exec
+    gui_system_exec="$(sed -n -E 's/^ExecStart=//p' "$GUI_SYSTEMD_SERVICE_PATH")"
+    info "GUI systemd ExecStart: ${gui_system_exec:-"(not set)"}"
+  else
+    warn "GUI systemd service not installed at ${GUI_SYSTEMD_SERVICE_PATH}."
   fi
 
   if [[ -f "$AGENT_ENV_FILE" ]]; then
@@ -424,8 +473,14 @@ full_reinstall() {
     if ${SUDO_BIN} systemctl is-enabled --quiet "$SERVICE_NAME" 2>/dev/null; then
       ${SUDO_BIN} systemctl disable "$SERVICE_NAME" || true
     fi
+    if ${SUDO_BIN} systemctl is-enabled --quiet "$GUI_SERVICE_NAME" 2>/dev/null; then
+      ${SUDO_BIN} systemctl disable "$GUI_SERVICE_NAME" || true
+    fi
     if ${SUDO_BIN} systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
       ${SUDO_BIN} systemctl stop "$SERVICE_NAME" || true
+    fi
+    if ${SUDO_BIN} systemctl is-active --quiet "$GUI_SERVICE_NAME" 2>/dev/null; then
+      ${SUDO_BIN} systemctl stop "$GUI_SERVICE_NAME" || true
     fi
   fi
 
@@ -433,6 +488,12 @@ full_reinstall() {
     ${SUDO_BIN} rm -f "$SYSTEMD_SERVICE_PATH"
     ${SUDO_BIN} systemctl daemon-reload || true
     info "Removed systemd service ${SYSTEMD_SERVICE_PATH}."
+  fi
+
+  if [[ -f "$GUI_SYSTEMD_SERVICE_PATH" ]]; then
+    ${SUDO_BIN} rm -f "$GUI_SYSTEMD_SERVICE_PATH"
+    ${SUDO_BIN} systemctl daemon-reload || true
+    info "Removed systemd service ${GUI_SYSTEMD_SERVICE_PATH}."
   fi
 
   if [[ -d "$CONFIG_DIR" ]]; then
@@ -456,7 +517,7 @@ Simple Namecheap DDNS Installer
 2) Update python paths in service/start scripts
 3) Install/update Python dependencies
 4) Configure system users and permissions (root)
-5) Install/update systemd service (root)
+5) Install/update systemd services (root)
 6) Update repository (git pull)
 7) Guided install (first time)
 8) Full reinstall (wipe config/data)
