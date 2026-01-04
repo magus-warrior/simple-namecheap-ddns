@@ -1,5 +1,14 @@
 # simple-namecheap-ddns
 
+## 3-minute install
+
+- `git clone https://github.com/<you>/simple-namecheap-ddns.git`
+- `cd simple-namecheap-ddns`
+- `./install.sh`
+- Open the Web UI at `http://<host>:8001`
+- Add a Namecheap DDNS secret + target in the UI
+- Confirm the dashboard logs update (see [Running with systemd](#running-with-systemd) for full install details)
+
 A lightweight, self-hosted Dynamic DNS (DDNS) manager for Namecheap. It consists of:
 
 - **Agent (background service)** that polls for your public IP and calls Namecheap’s DDNS
