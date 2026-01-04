@@ -150,8 +150,11 @@ The agent **decrypts** `encrypted_token` with `AGENT_MASTER_KEY` at runtime, sub
   (read/write only by the owning user).
 - `install.sh` stores `AGENT_MASTER_KEY` in `.ddns/agent.env`. When running without
   `DDNS_SYSTEM_WIDE=1`, it is created with `0600` (only the owning user can read it).
-  In system-wide mode, it is created with `0400` (root-only) or `0440` (root + group)
-  depending on installer settings; either way it is not world-readable.
+-  In system-wide mode, it is created with `0600` and owned by `ddns-admin` by default.
+-  Set `DDNS_SYSTEM_WIDE_GROUP_ACCESS=1` to allow group-readable access (`0640`) when
+  you explicitly want the `ddns-agent` group to read `.ddns/agent.env` and
+  `.ddns/config.enc.json`. When enabled, the group can also read `${DDNS_WORKDIR}/.ddns/agent.db`
+  and `webapp.db`, so restrict group membership accordingly.
 - Anyone with read access to these files can decrypt stored secrets and use the tokens.
 - If the host is compromised, an attacker can decrypt secrets, modify the configuration,
   or exfiltrate Namecheap tokens. Mitigate this by using full-disk encryption, limiting
@@ -175,6 +178,8 @@ The agent **decrypts** `encrypted_token` with `AGENT_MASTER_KEY` at runtime, sub
 - `DDNS_DATA_DIR`: where data files live (default `${DDNS_WORKDIR}/.ddns`).
 - `DDNS_SERVICE_USER`: user for systemd services (default: sudo user or `ddns-agent`).
 - `DDNS_SYSTEM_WIDE=1`: enable system user creation + sudoers entry.
+- `DDNS_SYSTEM_WIDE_GROUP_ACCESS=1`: allow group-readable access for system-wide installs
+  (`ddns-agent` group).
 
 ---
 
