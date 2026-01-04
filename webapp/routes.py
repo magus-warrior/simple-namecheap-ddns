@@ -6,6 +6,7 @@ import os
 import sqlite3
 from pathlib import Path
 from typing import Any
+import xml.etree.ElementTree as ElementTree
 
 from flask import Blueprint, abort, current_app, jsonify, render_template, request
 import requests
@@ -144,6 +145,77 @@ def _normalize_hostnames(value: str) -> str:
 
 def _split_hostnames(value: str) -> list[str]:
     return [host.strip() for host in value.split(",") if host.strip()]
+
+
+def _strip_xml_tag(tag: str) -> str:
+    return tag.split("}", 1)[-1]
+
+
+def _parse_namecheap_fields(body: str) -> dict[str, str]:
+    if not body or "<" not in body:
+        return {}
+    try:
+        root = ElementTree.fromstring(body)
+    except ElementTree.ParseError:
+        return {}
+    fields: dict[str, str] = {}
+    for elem in root.iter():
+        tag = _strip_xml_tag(elem.tag)
+        text = (elem.text or "").strip()
+        if tag == "ErrCount" and text:
+            fields["ErrCount"] = text
+        elif tag == "IsSuccess" and text:
+            fields["IsSuccess"] = text
+        elif tag.startswith("Err") and tag[3:].isdigit() and text:
+            fields[tag] = text
+        elif tag == "Error" and text and "Err1" not in fields:
+            fields["Err1"] = text
+        if "IsSuccess" in elem.attrib and "IsSuccess" not in fields:
+            fields["IsSuccess"] = elem.attrib["IsSuccess"]
+        if "ErrCount" in elem.attrib and "ErrCount" not in fields:
+            fields["ErrCount"] = elem.attrib["ErrCount"]
+    return fields
+
+
+def _is_namecheap_error(fields: dict[str, str]) -> bool:
+    err_count = fields.get("ErrCount")
+    if err_count:
+        try:
+            if int(err_count) > 0:
+                return True
+        except ValueError:
+            pass
+    is_success = fields.get("IsSuccess")
+    if is_success and is_success.strip().lower() in {"false", "0", "no"}:
+        return True
+    return False
+
+
+def _format_namecheap_message(
+    body: str,
+    response_code: int | None,
+    fields: dict[str, str],
+) -> str:
+    detail_parts: list[str] = []
+    if response_code is not None:
+        detail_parts.append(f"HTTP {response_code}")
+    if fields:
+        ordered_fields: list[str] = []
+        for key in ("ErrCount", "IsSuccess", "Err1"):
+            if key in fields:
+                ordered_fields.append(f"{key}={fields[key]}")
+        for key, value in fields.items():
+            if key in {"ErrCount", "IsSuccess", "Err1"}:
+                continue
+            ordered_fields.append(f"{key}={value}")
+        detail_parts.extend(ordered_fields)
+    base = body.strip()
+    if detail_parts:
+        detail = " | ".join(detail_parts)
+        if base:
+            return f"{base} ({detail})"
+        return detail
+    return base
 
 
 def _get_check_ip_url() -> str:
@@ -383,17 +455,34 @@ def force_target_update(target_id: int) -> Any:
                 ip=ip_address,
                 id=target.id,
             )
-            response_code = None
             try:
                 response = requests.get(update_url, timeout=20)
-                response.raise_for_status()
-                message = response.text.strip()
-                status = "success"
                 response_code = response.status_code
+                parsed_fields = _parse_namecheap_fields(response.text)
+                status = (
+                    "error"
+                    if response_code >= 400 or _is_namecheap_error(parsed_fields)
+                    else "success"
+                )
+                message = _format_namecheap_message(
+                    response.text,
+                    response_code,
+                    parsed_fields,
+                )
             except requests.RequestException as exc:
+                response = getattr(exc, "response", None)
+                response_code = getattr(response, "status_code", None)
+                parsed_fields = (
+                    _parse_namecheap_fields(response.text) if response else {}
+                )
                 message = str(exc)
                 status = "error"
-                response_code = getattr(exc.response, "status_code", None)
+                if parsed_fields or response_code is not None:
+                    message = _format_namecheap_message(
+                        message if not response else response.text,
+                        response_code,
+                        parsed_fields,
+                    )
 
             log_db.log_update(
                 UpdateRecord(
@@ -409,6 +498,7 @@ def force_target_update(target_id: int) -> Any:
                     "hostname": hostname,
                     "status": status,
                     "message": message,
+                    "parsed_fields": parsed_fields,
                     "response_code": response_code,
                 }
             )
