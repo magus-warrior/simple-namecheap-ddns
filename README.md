@@ -145,6 +145,18 @@ The agent **decrypts** `encrypted_token` with `AGENT_MASTER_KEY` at runtime, sub
 - `FLASK_MASTER_KEY`: **required** for the web UI to encrypt/decrypt secrets.
   - `start.sh` will generate and persist a key in `.flask_master_key` if missing.
 
+#### Trust model / key storage
+- `start.sh` persists `FLASK_MASTER_KEY` to `.flask_master_key` with permissions `0600`
+  (read/write only by the owning user).
+- `install.sh` stores `AGENT_MASTER_KEY` in `.ddns/agent.env`. When running without
+  `DDNS_SYSTEM_WIDE=1`, it is created with `0600` (only the owning user can read it).
+  In system-wide mode, it is created with `0400` (root-only) or `0440` (root + group)
+  depending on installer settings; either way it is not world-readable.
+- Anyone with read access to these files can decrypt stored secrets and use the tokens.
+- If the host is compromised, an attacker can decrypt secrets, modify the configuration,
+  or exfiltrate Namecheap tokens. Mitigate this by using full-disk encryption, limiting
+  shell access to trusted admins, and rotating keys/tokens after any suspected breach.
+
 ### Web UI / Flask
 - `FLASK_APP`: defaults to `app`.
 - `FLASK_RUN_HOST`: defaults to `0.0.0.0`.
