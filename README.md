@@ -168,8 +168,16 @@ The agent **decrypts** `encrypted_token` with `AGENT_MASTER_KEY` at runtime, sub
 
 ### Agent behavior
 - `AGENT_CHECK_IP_URL`: override public IP endpoint (default `https://api.ipify.org`).
+  - Must be `https://` and cannot point to localhost, loopback, private IPs, or
+    `file:`/`data:` URLs.
 - `AGENT_UPDATE_URL_TEMPLATE`: override Namecheap update URL template.
   - Default: `https://dynamicdns.park-your-domain.com/update?host={hostname}&domain={domain}&password={token}&ip={ip}`
+  - Must be `https://` and cannot point to localhost, loopback, private IPs, or
+    `file:`/`data:` URLs.
+- `AGENT_CHECK_IP_HOST_ALLOWLIST`: optional comma-separated hostname allowlist for
+  `AGENT_CHECK_IP_URL` (leave unset to allow any public host).
+- `AGENT_UPDATE_URL_HOST_ALLOWLIST`: optional comma-separated hostname allowlist for
+  `AGENT_UPDATE_URL_TEMPLATE` (e.g., `dynamicdns.park-your-domain.com`).
 - `AGENT_SERVICE_NAME`: name to reload after publishing (default `ddns-agent`).
 
 ### Installer / service configuration

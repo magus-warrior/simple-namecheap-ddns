@@ -12,6 +12,7 @@ import requests
 
 from agent.database import LogDB, UpdateRecord
 from shared_lib.security import CryptoManager
+from shared_lib.url_validation import parse_host_allowlist, validate_url
 from webapp.publisher import ConfigCompiler
 from webapp.models import Secret, Target, db
 
@@ -61,11 +62,20 @@ def _get_agent_key() -> str:
 
 
 def _publish_config() -> dict[str, Any] | None:
+    try:
+        check_ip_url = _get_check_ip_url()
+        update_url_template = _get_update_url_template()
+    except RuntimeError as exc:
+        current_app.logger.warning("Invalid URL configuration: %s", exc)
+        return {
+            "error": "Invalid URL configuration.",
+            "detail": str(exc),
+        }
     compiler = ConfigCompiler(
         flask_key=_get_flask_key(),
         agent_key=_get_agent_key(),
-        check_ip_url=os.environ.get("AGENT_CHECK_IP_URL", "https://api.ipify.org"),
-        update_url_template=_get_update_url_template(),
+        check_ip_url=check_ip_url,
+        update_url_template=update_url_template,
     )
     targets = Target.query.order_by(Target.id).all()
     try:
@@ -136,18 +146,42 @@ def _split_hostnames(value: str) -> list[str]:
     return [host.strip() for host in value.split(",") if host.strip()]
 
 
+def _get_check_ip_url() -> str:
+    check_ip_url = os.environ.get("AGENT_CHECK_IP_URL", "https://api.ipify.org")
+    allowlist = parse_host_allowlist(
+        os.environ.get("AGENT_CHECK_IP_HOST_ALLOWLIST")
+    )
+    try:
+        validate_url(check_ip_url, allowed_hosts=allowlist)
+    except ValueError as exc:
+        raise RuntimeError(f"AGENT_CHECK_IP_URL is invalid: {exc}") from exc
+    return check_ip_url
+
+
 def _get_update_url_template() -> str:
-    return os.environ.get(
+    update_url_template = os.environ.get(
         "AGENT_UPDATE_URL_TEMPLATE",
         (
             "https://dynamicdns.park-your-domain.com/update"
             "?host={hostname}&domain={domain}&password={token}&ip={ip}"
         ),
     )
+    allowlist = parse_host_allowlist(
+        os.environ.get("AGENT_UPDATE_URL_HOST_ALLOWLIST")
+    )
+    try:
+        validate_url(update_url_template, allowed_hosts=allowlist)
+    except ValueError as exc:
+        raise RuntimeError(f"AGENT_UPDATE_URL_TEMPLATE is invalid: {exc}") from exc
+    return update_url_template
 
 
 def _fetch_public_ip() -> str | None:
-    check_ip_url = os.environ.get("AGENT_CHECK_IP_URL", "https://api.ipify.org")
+    try:
+        check_ip_url = _get_check_ip_url()
+    except RuntimeError as exc:
+        current_app.logger.warning("Invalid check IP URL: %s", exc)
+        return None
     try:
         response = requests.get(check_ip_url, timeout=10)
         response.raise_for_status()
@@ -334,7 +368,10 @@ def force_target_update(target_id: int) -> Any:
     if not hostnames:
         return jsonify({"error": "Target hostnames are empty"}), 400
 
-    update_url_template = _get_update_url_template()
+    try:
+        update_url_template = _get_update_url_template()
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 400
     results: list[dict[str, Any]] = []
     log_db = LogDB(current_app.config.get("AGENT_DB_PATH", "agent.db"))
     try:
