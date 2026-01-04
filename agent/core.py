@@ -7,6 +7,7 @@ import logging
 import os
 from pathlib import Path
 from typing import Optional
+import xml.etree.ElementTree as ElementTree
 
 import requests
 
@@ -14,6 +15,77 @@ from agent.database import LogDB, UpdateRecord
 from shared_lib.schema import AgentConfig
 from shared_lib.security import CryptoManager
 from shared_lib.url_validation import parse_host_allowlist, validate_url
+
+
+def _strip_xml_tag(tag: str) -> str:
+    return tag.split("}", 1)[-1]
+
+
+def _parse_namecheap_fields(body: str) -> dict[str, str]:
+    if not body or "<" not in body:
+        return {}
+    try:
+        root = ElementTree.fromstring(body)
+    except ElementTree.ParseError:
+        return {}
+    fields: dict[str, str] = {}
+    for elem in root.iter():
+        tag = _strip_xml_tag(elem.tag)
+        text = (elem.text or "").strip()
+        if tag == "ErrCount" and text:
+            fields["ErrCount"] = text
+        elif tag == "IsSuccess" and text:
+            fields["IsSuccess"] = text
+        elif tag.startswith("Err") and tag[3:].isdigit() and text:
+            fields[tag] = text
+        elif tag == "Error" and text and "Err1" not in fields:
+            fields["Err1"] = text
+        if "IsSuccess" in elem.attrib and "IsSuccess" not in fields:
+            fields["IsSuccess"] = elem.attrib["IsSuccess"]
+        if "ErrCount" in elem.attrib and "ErrCount" not in fields:
+            fields["ErrCount"] = elem.attrib["ErrCount"]
+    return fields
+
+
+def _is_namecheap_error(fields: dict[str, str]) -> bool:
+    err_count = fields.get("ErrCount")
+    if err_count:
+        try:
+            if int(err_count) > 0:
+                return True
+        except ValueError:
+            pass
+    is_success = fields.get("IsSuccess")
+    if is_success and is_success.strip().lower() in {"false", "0", "no"}:
+        return True
+    return False
+
+
+def _format_namecheap_message(
+    body: str,
+    response_code: Optional[int],
+    fields: dict[str, str],
+) -> str:
+    detail_parts: list[str] = []
+    if response_code is not None:
+        detail_parts.append(f"HTTP {response_code}")
+    if fields:
+        ordered_fields: list[str] = []
+        for key in ("ErrCount", "IsSuccess", "Err1"):
+            if key in fields:
+                ordered_fields.append(f"{key}={fields[key]}")
+        for key, value in fields.items():
+            if key in {"ErrCount", "IsSuccess", "Err1"}:
+                continue
+            ordered_fields.append(f"{key}={value}")
+        detail_parts.extend(ordered_fields)
+    base = body.strip()
+    if detail_parts:
+        detail = " | ".join(detail_parts)
+        if base:
+            return f"{base} ({detail})"
+        return detail
+    return base
 
 
 class DDNSRunner:
@@ -204,20 +276,33 @@ class DDNSRunner:
                     )
                     continue
                 response = self._session.get(update_url, timeout=20)
-                response.raise_for_status()
-                message = response.text.strip()
+                response_code = response.status_code
+                parsed_fields = _parse_namecheap_fields(response.text)
+                status = (
+                    "error"
+                    if response_code >= 400 or _is_namecheap_error(parsed_fields)
+                    else "success"
+                )
+                message = _format_namecheap_message(
+                    response.text,
+                    response_code,
+                    parsed_fields,
+                )
                 self._db.log_update(
                     UpdateRecord(
                         target_id=target.id,
-                        status="success",
+                        status=status,
                         message=message,
-                        response_code=response.status_code,
+                        response_code=response_code,
                         ip_address=current_ip,
                     )
                 )
-                if current_ip:
+                if status == "success" and current_ip:
                     self._db.set_cache(f"last_ip:{target.id}", current_ip)
-                logging.info("Updated %s: %s", target.hostname, message)
+                if status == "success":
+                    logging.info("Updated %s: %s", target.hostname, message)
+                else:
+                    logging.warning("Update failed for %s: %s", target.hostname, message)
             except requests.RequestException as exc:
                 self._db.log_update(
                     UpdateRecord(
