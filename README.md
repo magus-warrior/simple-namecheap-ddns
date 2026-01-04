@@ -191,6 +191,39 @@ The agent **decrypts** `encrypted_token` with `AGENT_MASTER_KEY` at runtime, sub
 
 ---
 
+## Headless mode (agent-only)
+
+If you want to run just the agent without the web UI, you can supply the config file
+directly and skip the publisher.
+
+### Minimal environment variables
+
+- `AGENT_MASTER_KEY`: **required** to decrypt tokens in the config.
+- `AGENT_CONFIG_PATH`: path to the encrypted agent config JSON.
+- `DDNS_WORKDIR`: base working directory for `.ddns/` (used for logs/cache).
+
+### Example static config JSON (matches `shared_lib/schema.py`)
+
+```json
+{
+  "check_ip_url": "https://api.ipify.org",
+  "targets": [
+    {
+      "id": "manual-1",
+      "hostname": "www",
+      "update_url": "https://dynamicdns.park-your-domain.com/update?host=www&domain=example.com&password={token}&ip={ip}",
+      "encrypted_token": "<fernet-encrypted token>",
+      "interval": 300
+    }
+  ]
+}
+```
+
+The `encrypted_token` value must be encrypted with the same `AGENT_MASTER_KEY` that the
+agent uses at runtime.
+
+---
+
 ## Running locally (no systemd)
 
 ### Web UI
