@@ -13,6 +13,7 @@ import requests
 from agent.database import LogDB, UpdateRecord
 from shared_lib.schema import AgentConfig
 from shared_lib.security import CryptoManager
+from shared_lib.url_validation import parse_host_allowlist, validate_url
 
 
 class DDNSRunner:
@@ -42,6 +43,12 @@ class DDNSRunner:
         self._config: Optional[AgentConfig] = None
         self._config_mtime: Optional[float] = None
         self._crypto = CryptoManager(self._get_master_key())
+        self._check_ip_allowlist = parse_host_allowlist(
+            os.environ.get("AGENT_CHECK_IP_HOST_ALLOWLIST")
+        )
+        self._update_url_allowlist = parse_host_allowlist(
+            os.environ.get("AGENT_UPDATE_URL_HOST_ALLOWLIST")
+        )
 
     def _get_master_key(self) -> str:
         key = os.environ.get("AGENT_MASTER_KEY")
@@ -105,8 +112,14 @@ class DDNSRunner:
         return self._config
 
     def _fetch_public_ip(self, config: AgentConfig) -> Optional[str]:
+        check_ip_url = str(config.check_ip_url)
         try:
-            response = self._session.get(str(config.check_ip_url), timeout=10)
+            validate_url(check_ip_url, allowed_hosts=self._check_ip_allowlist)
+        except ValueError as exc:
+            logging.warning("Check IP URL rejected: %s", exc)
+            return None
+        try:
+            response = self._session.get(check_ip_url, timeout=10)
             response.raise_for_status()
             return response.text.strip()
         except requests.RequestException as exc:
@@ -168,6 +181,28 @@ class DDNSRunner:
                     target.id,
                     current_ip,
                 )
+                try:
+                    validate_url(
+                        update_url,
+                        allowed_hosts=self._update_url_allowlist,
+                    )
+                except ValueError as exc:
+                    message = f"Update URL rejected: {exc}"
+                    self._db.log_update(
+                        UpdateRecord(
+                            target_id=target.id,
+                            status="error",
+                            message=message,
+                            response_code=None,
+                            ip_address=current_ip,
+                        )
+                    )
+                    logging.warning(
+                        "Skipping %s due to invalid update URL: %s",
+                        target.hostname,
+                        exc,
+                    )
+                    continue
                 response = self._session.get(update_url, timeout=20)
                 response.raise_for_status()
                 message = response.text.strip()
