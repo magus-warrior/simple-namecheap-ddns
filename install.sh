@@ -143,17 +143,29 @@ ensure_env_workdir() {
     ensure_root
   fi
 
-  local env_mode="0400"
+  local env_mode="0600"
+  local dir_mode="0700"
+  local owner="root"
+  local group="root"
+  local group_access="${DDNS_SYSTEM_WIDE_GROUP_ACCESS:-}"
+
   if [[ "${DDNS_SYSTEM_WIDE:-}" == "1" ]]; then
-    env_mode="0440"
+    owner="ddns-admin"
+    group="ddns-admin"
+
+    if [[ "${group_access}" == "1" ]]; then
+      env_mode="0640"
+      dir_mode="0750"
+      group="ddns-agent"
+    fi
   fi
 
   if [[ ! -f "${AGENT_ENV_FILE}" ]]; then
     if needs_root; then
-      ${SUDO_BIN} install -d -m 0750 -o root -g root "${CONFIG_DIR}"
-      ${SUDO_BIN} install -m "${env_mode}" -o root -g root /dev/null "${AGENT_ENV_FILE}"
+      ${SUDO_BIN} install -d -m "${dir_mode}" -o "${owner}" -g "${group}" "${CONFIG_DIR}"
+      ${SUDO_BIN} install -m "${env_mode}" -o "${owner}" -g "${group}" /dev/null "${AGENT_ENV_FILE}"
     else
-      mkdir -p "${CONFIG_DIR}"
+      install -d -m 0700 "${CONFIG_DIR}"
       install -m 0600 /dev/null "${AGENT_ENV_FILE}"
     fi
     info "Created ${AGENT_ENV_FILE}."
@@ -179,6 +191,13 @@ setup_permissions() {
   local flask_db_path="${FLASK_DB_PATH:-${DATA_DIR}/webapp.db}"
   local sudoers_file="/etc/sudoers.d/ddns-admin"
   local allow_system_wide="${DDNS_SYSTEM_WIDE:-}"
+  local group_access="${DDNS_SYSTEM_WIDE_GROUP_ACCESS:-}"
+  local config_dir_mode="0700"
+  local data_dir_mode="0700"
+  local config_file_mode="0600"
+  local env_file_mode="0600"
+  local owner="root"
+  local group="root"
 
   if needs_root; then
     ensure_root
@@ -196,43 +215,54 @@ setup_permissions() {
         info "Created user ddns-agent."
       fi
 
-      ${SUDO_BIN} install -d -m 0750 -o ddns-admin -g ddns-agent "${CONFIG_DIR}"
-      ${SUDO_BIN} install -d -m 0750 -o ddns-agent -g ddns-agent "${DATA_DIR}"
+      owner="ddns-admin"
+      group="ddns-admin"
+
+      if [[ "${group_access}" == "1" ]]; then
+        config_dir_mode="0750"
+        data_dir_mode="0750"
+        config_file_mode="0640"
+        env_file_mode="0640"
+        group="ddns-agent"
+      fi
+
+      ${SUDO_BIN} install -d -m "${config_dir_mode}" -o "${owner}" -g "${group}" "${CONFIG_DIR}"
+      ${SUDO_BIN} install -d -m "${data_dir_mode}" -o "${owner}" -g "${group}" "${DATA_DIR}"
 
       if [[ ! -f "${AGENT_CONFIG_FILE}" ]]; then
-        ${SUDO_BIN} install -m 0640 -o ddns-admin -g ddns-agent /dev/null "${AGENT_CONFIG_FILE}"
+        ${SUDO_BIN} install -m "${config_file_mode}" -o "${owner}" -g "${group}" /dev/null "${AGENT_CONFIG_FILE}"
       else
-        ${SUDO_BIN} chown ddns-admin:ddns-agent "${AGENT_CONFIG_FILE}"
-        ${SUDO_BIN} chmod 0640 "${AGENT_CONFIG_FILE}"
+        ${SUDO_BIN} chown "${owner}:${group}" "${AGENT_CONFIG_FILE}"
+        ${SUDO_BIN} chmod "${config_file_mode}" "${AGENT_CONFIG_FILE}"
       fi
 
       if [[ ! -f "${AGENT_ENV_FILE}" ]]; then
-        ${SUDO_BIN} install -m 0440 -o ddns-admin -g ddns-agent /dev/null "${AGENT_ENV_FILE}"
+        ${SUDO_BIN} install -m "${env_file_mode}" -o "${owner}" -g "${group}" /dev/null "${AGENT_ENV_FILE}"
       else
-        ${SUDO_BIN} chown ddns-admin:ddns-agent "${AGENT_ENV_FILE}"
-        ${SUDO_BIN} chmod 0440 "${AGENT_ENV_FILE}"
+        ${SUDO_BIN} chown "${owner}:${group}" "${AGENT_ENV_FILE}"
+        ${SUDO_BIN} chmod "${env_file_mode}" "${AGENT_ENV_FILE}"
       fi
     else
       warn "DDNS_SYSTEM_WIDE not set; skipping system user and sudoers setup."
-      ${SUDO_BIN} install -d -m 0750 -o root -g root "${CONFIG_DIR}"
-      ${SUDO_BIN} install -d -m 0750 -o root -g root "${DATA_DIR}"
+      ${SUDO_BIN} install -d -m 0700 -o root -g root "${CONFIG_DIR}"
+      ${SUDO_BIN} install -d -m 0700 -o root -g root "${DATA_DIR}"
 
       if [[ ! -f "${AGENT_CONFIG_FILE}" ]]; then
-        ${SUDO_BIN} install -m 0400 -o root -g root /dev/null "${AGENT_CONFIG_FILE}"
+        ${SUDO_BIN} install -m 0600 -o root -g root /dev/null "${AGENT_CONFIG_FILE}"
       else
         ${SUDO_BIN} chown root:root "${AGENT_CONFIG_FILE}"
-        ${SUDO_BIN} chmod 0400 "${AGENT_CONFIG_FILE}"
+        ${SUDO_BIN} chmod 0600 "${AGENT_CONFIG_FILE}"
       fi
 
       if [[ ! -f "${AGENT_ENV_FILE}" ]]; then
-        ${SUDO_BIN} install -m 0400 -o root -g root /dev/null "${AGENT_ENV_FILE}"
+        ${SUDO_BIN} install -m 0600 -o root -g root /dev/null "${AGENT_ENV_FILE}"
       else
         ${SUDO_BIN} chown root:root "${AGENT_ENV_FILE}"
-        ${SUDO_BIN} chmod 0400 "${AGENT_ENV_FILE}"
+        ${SUDO_BIN} chmod 0600 "${AGENT_ENV_FILE}"
       fi
     fi
   else
-    mkdir -p "${CONFIG_DIR}" "${DATA_DIR}"
+    install -d -m 0700 "${CONFIG_DIR}" "${DATA_DIR}"
     install -m 0600 /dev/null "${AGENT_CONFIG_FILE}"
     install -m 0600 /dev/null "${AGENT_ENV_FILE}"
   fi
@@ -250,7 +280,7 @@ print(base64.urlsafe_b64encode(os.urandom(32)).decode("utf-8"))
 PY
 )"
     echo "AGENT_MASTER_KEY=${agent_key}" | ${SUDO_BIN} tee -a "${AGENT_ENV_FILE}" >/dev/null
-    ${SUDO_BIN} chmod 0400 "${AGENT_ENV_FILE}"
+    ${SUDO_BIN} chmod "${env_file_mode}" "${AGENT_ENV_FILE}"
     info "Generated AGENT_MASTER_KEY in ${AGENT_ENV_FILE}."
   fi
 
