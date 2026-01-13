@@ -151,15 +151,20 @@
               <h3 id="targets-title">Targets</h3>
               <span class="badge" id="targets-count">0</span>
             </div>
-            <button
-              type="button"
-              class="panel-action"
-              id="target-add-header"
-              aria-expanded="false"
-              aria-controls="target-drawer"
-            >
-              + Add target
-            </button>
+            <div class="tab-panel-actions">
+              <button type="button" class="panel-action" id="targets-force-all">
+                Update all
+              </button>
+              <button
+                type="button"
+                class="panel-action"
+                id="target-add-header"
+                aria-expanded="false"
+                aria-controls="target-drawer"
+              >
+                + Add target
+              </button>
+            </div>
           </div>
           <div class="list-row">
             <div class="list-row-items" id="targets-list" aria-live="polite"></div>
