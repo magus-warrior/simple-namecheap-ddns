@@ -10,7 +10,7 @@ from typing import Iterable
 
 from shared_lib.schema import AgentConfig, AgentTarget
 from shared_lib.security import CryptoManager
-from webapp.models import Target
+from webapp.models import AppSettings, Target
 
 
 class ConfigCompiler:
@@ -76,19 +76,31 @@ class ConfigCompiler:
             interval=interval_seconds,
         )
 
-    def compile(self, targets: Iterable[Target]) -> AgentConfig:
+    def compile(
+        self,
+        targets: Iterable[Target],
+        settings: AppSettings | None = None,
+    ) -> AgentConfig:
         active_targets = [t for t in targets if t.is_enabled]
         expanded_targets: list[AgentTarget] = []
         for target in active_targets:
             for hostname in self._split_hosts(target.host):
                 expanded_targets.append(self._build_target(target, hostname))
+        manual_ip_enabled = settings.manual_ip_enabled if settings else False
+        manual_ip_address = settings.manual_ip_address if settings else None
         return AgentConfig(
             check_ip_url=self._check_ip_url,
             targets=expanded_targets,
+            manual_ip_enabled=manual_ip_enabled,
+            manual_ip_address=manual_ip_address,
         )
 
-    def publish(self, targets: Iterable[Target]) -> AgentConfig:
-        config = self.compile(targets)
+    def publish(
+        self,
+        targets: Iterable[Target],
+        settings: AppSettings | None = None,
+    ) -> AgentConfig:
+        config = self.compile(targets, settings)
         if hasattr(config, "model_dump"):
             payload = json.dumps(config.model_dump(mode="json"), indent=2)
         else:

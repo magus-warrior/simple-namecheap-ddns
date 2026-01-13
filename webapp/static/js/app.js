@@ -98,6 +98,11 @@ const TAB_LOGS = document.getElementById("tab-logs");
 const PANEL_SECRETS = document.getElementById("panel-secrets");
 const PANEL_TARGETS = document.getElementById("panel-targets");
 const PANEL_LOGS = document.getElementById("panel-logs");
+const SETTINGS_FORM = document.getElementById("settings-form");
+const SETTINGS_STATUS = document.getElementById("settings-status");
+const SETTINGS_SUBMIT = document.getElementById("settings-submit");
+const MANUAL_IP_ENABLED = document.getElementById("manual-ip-enabled");
+const MANUAL_IP_ADDRESS = document.getElementById("manual-ip-address");
 
 const secretsCache = [];
 let editingSecretId = null;
@@ -288,6 +293,17 @@ const renderTargets = (targets, secrets) => {
     });
   }
   TARGETS_COUNT.textContent = targets.length;
+};
+
+const renderSettings = (settings) => {
+  const manualEnabled = Boolean(settings?.manual_ip_enabled);
+  const manualAddress = settings?.manual_ip_address ?? "";
+  MANUAL_IP_ENABLED.checked = manualEnabled;
+  MANUAL_IP_ADDRESS.value = manualAddress;
+  MANUAL_IP_ADDRESS.disabled = !manualEnabled;
+  SETTINGS_STATUS.textContent = manualEnabled
+    ? `On • ${manualAddress || "Missing IP"}`
+    : "Off";
 };
 
 const parseAgentMessage = (message) => {
@@ -590,6 +606,26 @@ const forceTargetUpdate = async (targetId) => {
   return payload;
 };
 
+const updateSettings = async () => {
+  const payload = {
+    manual_ip_enabled: MANUAL_IP_ENABLED.checked,
+    manual_ip_address: MANUAL_IP_ADDRESS.value.trim() || null,
+  };
+  const response = await fetch("/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    await throwResponseError(response, "Unable to update settings");
+  }
+  const responsePayload = await response.json();
+  return {
+    settings: responsePayload,
+    publishError: responsePayload?.publish_error ?? null,
+  };
+};
+
 const deleteTarget = async (targetId) => {
   if (!confirm("Delete this target?")) {
     return;
@@ -612,22 +648,30 @@ const deleteTarget = async (targetId) => {
 const loadData = async () => {
   try {
     setStatus("Syncing neon data streams…");
-    const [secretsResponse, targetsResponse, logsResponse] = await Promise.all([
+    const [secretsResponse, targetsResponse, logsResponse, settingsResponse] = await Promise.all([
       fetch("/secrets"),
       fetch("/targets"),
       fetch("/dashboard"),
+      fetch("/settings"),
     ]);
-    if (!secretsResponse.ok || !targetsResponse.ok || !logsResponse.ok) {
+    if (
+      !secretsResponse.ok ||
+      !targetsResponse.ok ||
+      !logsResponse.ok ||
+      !settingsResponse.ok
+    ) {
       throw new Error("Failed to fetch data");
     }
-    const [secrets, targets, logsPayload] = await Promise.all([
+    const [secrets, targets, logsPayload, settingsPayload] = await Promise.all([
       secretsResponse.json(),
       targetsResponse.json(),
       logsResponse.json(),
+      settingsResponse.json(),
     ]);
     renderSecrets(secrets, targets);
     renderTargets(targets, secrets);
     renderLogs(logsPayload.logs ?? [], targets);
+    renderSettings(settingsPayload);
     const refreshTime = formatTime(Date.now());
     setStatus(`Status loaded from agent log store • Last refresh ${refreshTime} • Config publish: —`);
   } catch (error) {
@@ -750,6 +794,29 @@ TARGET_SECRET_FORM.addEventListener("submit", async (event) => {
   } catch (error) {
     TARGET_SECRET_SUBMIT.disabled = false;
     setStatus(`Secret save failed — ${error.message || "check inputs"}`, true);
+  }
+});
+
+MANUAL_IP_ENABLED.addEventListener("change", () => {
+  MANUAL_IP_ADDRESS.disabled = !MANUAL_IP_ENABLED.checked;
+});
+
+SETTINGS_FORM.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    SETTINGS_SUBMIT.disabled = true;
+    setStatus("Saving settings…");
+    const { settings, publishError } = await updateSettings();
+    renderSettings(settings);
+    if (publishError) {
+      setStatus(`Settings saved • ${formatPublishError(publishError)}`, true);
+    } else {
+      setStatus("Settings saved.");
+    }
+  } catch (error) {
+    setStatus(`Settings save failed — ${error.message || "check inputs"}`, true);
+  } finally {
+    SETTINGS_SUBMIT.disabled = false;
   }
 });
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import os
 import sqlite3
 from pathlib import Path
@@ -15,7 +16,7 @@ from agent.database import LogDB, UpdateRecord
 from shared_lib.security import CryptoManager
 from shared_lib.url_validation import parse_host_allowlist, validate_url
 from webapp.publisher import ConfigCompiler
-from webapp.models import Secret, Target, db
+from webapp.models import AppSettings, Secret, Target, db
 
 bp = Blueprint(
     "webapp",
@@ -62,6 +63,15 @@ def _get_agent_key() -> str:
     raise RuntimeError("AGENT_MASTER_KEY is required to publish agent config")
 
 
+def _get_app_settings() -> AppSettings:
+    settings = AppSettings.query.first()
+    if settings is None:
+        settings = AppSettings(manual_ip_enabled=False, manual_ip_address=None)
+        db.session.add(settings)
+        db.session.commit()
+    return settings
+
+
 def _publish_config() -> dict[str, Any] | None:
     try:
         check_ip_url = _get_check_ip_url()
@@ -79,8 +89,9 @@ def _publish_config() -> dict[str, Any] | None:
         update_url_template=update_url_template,
     )
     targets = Target.query.order_by(Target.id).all()
+    settings = _get_app_settings()
     try:
-        compiler.publish(targets)
+        compiler.publish(targets, settings)
     except (OSError, RuntimeError) as exc:
         config_path = getattr(compiler, "_config_path", None)
         current_app.logger.exception(
@@ -114,6 +125,13 @@ def _target_to_dict(target: Target) -> dict[str, Any]:
         "secret_id": target.secret_id,
         "is_enabled": target.is_enabled,
         "interval_minutes": target.interval_minutes,
+    }
+
+
+def _settings_to_dict(settings: AppSettings) -> dict[str, Any]:
+    return {
+        "manual_ip_enabled": settings.manual_ip_enabled,
+        "manual_ip_address": settings.manual_ip_address,
     }
 
 
@@ -263,10 +281,70 @@ def _fetch_public_ip() -> str | None:
         return None
 
 
+def _normalize_manual_ip(value: Any) -> str | None:
+    if value in (None, ""):
+        return None
+    return str(ipaddress.ip_address(str(value)))
+
+
 @bp.get("/secrets")
 def list_secrets() -> Any:
     secrets = Secret.query.order_by(Secret.name).all()
     return jsonify([_secret_to_dict(secret) for secret in secrets])
+
+
+@bp.get("/settings")
+def get_settings() -> Any:
+    settings = _get_app_settings()
+    return jsonify(_settings_to_dict(settings))
+
+
+@bp.put("/settings")
+def update_settings() -> Any:
+    settings = _get_app_settings()
+    payload = request.get_json(silent=True) or {}
+    manual_ip_enabled = (
+        bool(payload.get("manual_ip_enabled"))
+        if "manual_ip_enabled" in payload
+        else settings.manual_ip_enabled
+    )
+    manual_ip_address = settings.manual_ip_address
+    if "manual_ip_address" in payload:
+        try:
+            manual_ip_address = _normalize_manual_ip(
+                payload.get("manual_ip_address")
+            )
+        except ValueError:
+            return (
+                jsonify(
+                    {
+                        "error": (
+                            "manual_ip_address must be a valid IPv4 or IPv6 address"
+                        )
+                    }
+                ),
+                400,
+            )
+    if manual_ip_enabled and not manual_ip_address:
+        return (
+            jsonify(
+                {
+                    "error": (
+                        "manual_ip_address is required when manual_ip_enabled is true"
+                    )
+                }
+            ),
+            400,
+        )
+
+    settings.manual_ip_enabled = manual_ip_enabled
+    settings.manual_ip_address = manual_ip_address
+    db.session.commit()
+    publish_error = _publish_config()
+    response_payload = _settings_to_dict(settings)
+    if publish_error:
+        response_payload["publish_error"] = publish_error
+    return jsonify(response_payload)
 
 
 @bp.post("/secrets")

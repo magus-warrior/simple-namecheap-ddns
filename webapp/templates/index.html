@@ -58,6 +58,38 @@
           </div>
         </div>
 
+        <div class="tab-panel is-active" id="panel-settings">
+          <div class="tab-panel-header">
+            <div class="tab-panel-title">
+              <h3 id="settings-title">Manual IP Override</h3>
+              <span class="badge" id="settings-status">Off</span>
+            </div>
+          </div>
+          <form class="form" id="settings-form">
+            <div class="form-row">
+              <label class="checkbox">
+                <input id="manual-ip-enabled" name="manual_ip_enabled" type="checkbox" />
+                Enable manual IP override
+              </label>
+              <label>
+                IP address
+                <input
+                  id="manual-ip-address"
+                  name="manual_ip_address"
+                  type="text"
+                  placeholder="203.0.113.42"
+                />
+              </label>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="primary" id="settings-submit">Save settings</button>
+            </div>
+            <p class="form-hint" id="settings-hint">
+              When enabled, the agent will use this IP instead of detecting the public IP.
+            </p>
+          </form>
+        </div>
+
         <div class="tab-panel is-active" id="panel-secrets" role="tabpanel" aria-labelledby="tab-secrets">
           <div class="tab-panel-header">
             <div class="tab-panel-title">
