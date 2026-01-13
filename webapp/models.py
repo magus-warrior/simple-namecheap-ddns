@@ -37,3 +37,17 @@ class Target(db.Model):
 
     def __repr__(self) -> str:
         return f"<Target id={self.id} host={self.host!r} domain={self.domain!r}>"
+
+
+class AppSettings(db.Model):
+    __tablename__ = "app_settings"
+
+    id = db.Column(db.Integer, primary_key=True)
+    manual_ip_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    manual_ip_address = db.Column(db.String(64), nullable=True)
+
+    def __repr__(self) -> str:
+        return (
+            "<AppSettings id="
+            f"{self.id} manual_ip_enabled={self.manual_ip_enabled}>"
+        )

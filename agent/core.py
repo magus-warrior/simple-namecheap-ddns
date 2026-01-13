@@ -222,7 +222,19 @@ class DDNSRunner:
         if not config.targets:
             logging.info("No DDNS targets configured; skipping update cycle.")
             return
-        current_ip = self._fetch_public_ip(config)
+        current_ip: Optional[str]
+        if config.manual_ip_enabled:
+            if config.manual_ip_address:
+                current_ip = config.manual_ip_address
+                logging.info("Manual override IP in effect: %s", current_ip)
+            else:
+                logging.warning(
+                    "Manual override enabled but no IP configured; "
+                    "falling back to public IP lookup."
+                )
+                current_ip = self._fetch_public_ip(config)
+        else:
+            current_ip = self._fetch_public_ip(config)
         cached_ip = self._db.get_cache("last_ip")
         skip_unchanged_ip = current_ip and cached_ip == current_ip
         if skip_unchanged_ip:
