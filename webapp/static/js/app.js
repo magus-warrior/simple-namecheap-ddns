@@ -336,13 +336,23 @@ const renderLogs = (logs, targets) => {
       acc[target.id] = formatTargetLabel(target);
       return acc;
     }, {});
+    const statusLabels = {
+      success: "OK",
+      error: "FAIL",
+      skipped: "SKIP",
+    };
     logs.forEach((log) => {
       const parsed = parseAgentMessage(log.message);
+      const statusLabel =
+        statusLabels[log.status] ?? String(log.status ?? "").toUpperCase();
+      const targetLabel =
+        targetLabels[log.target_id] ??
+        (log.target_id === "cycle" ? "Cycle" : `Target #${log.target_id}`);
       const row = document.createElement("div");
       row.className = "table-row log-row";
       row.innerHTML = `
-        <span>${targetLabels[log.target_id] ?? `Target #${log.target_id}`}</span>
-        <span>${log.status === "success" ? "OK" : "FAIL"}</span>
+        <span>${targetLabel}</span>
+        <span>${statusLabel}</span>
         <span>${log.ip_address ?? "-"}</span>
         <span>${parsed.errCount}</span>
         <span>${parsed.errorSummary}</span>
