@@ -287,6 +287,147 @@ def _normalize_manual_ip(value: Any) -> str | None:
     return str(ipaddress.ip_address(str(value)))
 
 
+def _log_update(
+    log_db: LogDB,
+    target_id: int,
+    status: str,
+    message: str,
+    response_code: int | None,
+    ip_address: str | None,
+) -> None:
+    log_db.log_update(
+        UpdateRecord(
+            target_id=str(target_id),
+            status=status,
+            message=message,
+            response_code=response_code,
+            ip_address=ip_address,
+        )
+    )
+
+
+def _force_update_target(
+    target: Target,
+    *,
+    ip_address: str | None,
+    log_db: LogDB,
+    secret_value: str,
+    update_url_template: str,
+) -> dict[str, Any]:
+    hostnames = _split_hostnames(target.host)
+    results: list[dict[str, Any]] = []
+    if not hostnames:
+        message = "Target hostnames are empty"
+        _log_update(
+            log_db,
+            target_id=target.id,
+            status="error",
+            message=message,
+            response_code=None,
+            ip_address=ip_address,
+        )
+        results.append(
+            {
+                "hostname": None,
+                "status": "error",
+                "message": message,
+                "parsed_fields": {},
+                "response_code": None,
+            }
+        )
+        return {
+            "target_id": target.id,
+            "ip_address": ip_address,
+            "results": results,
+        }
+
+    if not ip_address:
+        message = "Unable to fetch public IP"
+        for hostname in hostnames:
+            _log_update(
+                log_db,
+                target_id=target.id,
+                status="error",
+                message=message,
+                response_code=None,
+                ip_address=None,
+            )
+            results.append(
+                {
+                    "hostname": hostname,
+                    "status": "error",
+                    "message": message,
+                    "parsed_fields": {},
+                    "response_code": None,
+                }
+            )
+        return {
+            "target_id": target.id,
+            "ip_address": ip_address,
+            "results": results,
+        }
+
+    for hostname in hostnames:
+        update_url = update_url_template.format(
+            hostname=hostname,
+            domain=target.domain,
+            token=secret_value,
+            ip=ip_address,
+            id=target.id,
+        )
+        try:
+            response = requests.get(update_url, timeout=20)
+            response_code = response.status_code
+            parsed_fields = _parse_namecheap_fields(response.text)
+            status = (
+                "error"
+                if response_code >= 400 or _is_namecheap_error(parsed_fields)
+                else "success"
+            )
+            message = _format_namecheap_message(
+                response.text,
+                response_code,
+                parsed_fields,
+            )
+        except requests.RequestException as exc:
+            response = getattr(exc, "response", None)
+            response_code = getattr(response, "status_code", None)
+            parsed_fields = (
+                _parse_namecheap_fields(response.text) if response else {}
+            )
+            message = str(exc)
+            status = "error"
+            if parsed_fields or response_code is not None:
+                message = _format_namecheap_message(
+                    message if not response else response.text,
+                    response_code,
+                    parsed_fields,
+                )
+
+        _log_update(
+            log_db,
+            target_id=target.id,
+            status=status,
+            message=message,
+            response_code=response_code,
+            ip_address=ip_address,
+        )
+        results.append(
+            {
+                "hostname": hostname,
+                "status": status,
+                "message": message,
+                "parsed_fields": parsed_fields,
+                "response_code": response_code,
+            }
+        )
+    return {
+        "target_id": target.id,
+        "ip_address": ip_address,
+        "results": results,
+    }
+
+
 @bp.get("/secrets")
 def list_secrets() -> Any:
     secrets = Secret.query.order_by(Secret.name).all()
@@ -510,83 +651,62 @@ def force_target_update(target_id: int) -> Any:
         return jsonify({"error": str(exc)}), 400
 
     secret_value = crypto.decrypt_str(target.secret.encrypted_value)
-    ip_address = _fetch_public_ip()
-    if not ip_address:
-        return jsonify({"error": "Unable to fetch public IP"}), 502
-
-    hostnames = _split_hostnames(target.host)
-    if not hostnames:
-        return jsonify({"error": "Target hostnames are empty"}), 400
-
     try:
         update_url_template = _get_update_url_template()
     except RuntimeError as exc:
         return jsonify({"error": str(exc)}), 400
-    results: list[dict[str, Any]] = []
+    ip_address = _fetch_public_ip()
+    if not ip_address:
+        return jsonify({"error": "Unable to fetch public IP"}), 502
+    if not _split_hostnames(target.host):
+        return jsonify({"error": "Target hostnames are empty"}), 400
     log_db = LogDB(current_app.config.get("AGENT_DB_PATH", "agent.db"))
     try:
-        for hostname in hostnames:
-            update_url = update_url_template.format(
-                hostname=hostname,
-                domain=target.domain,
-                token=secret_value,
-                ip=ip_address,
-                id=target.id,
-            )
-            try:
-                response = requests.get(update_url, timeout=20)
-                response_code = response.status_code
-                parsed_fields = _parse_namecheap_fields(response.text)
-                status = (
-                    "error"
-                    if response_code >= 400 or _is_namecheap_error(parsed_fields)
-                    else "success"
-                )
-                message = _format_namecheap_message(
-                    response.text,
-                    response_code,
-                    parsed_fields,
-                )
-            except requests.RequestException as exc:
-                response = getattr(exc, "response", None)
-                response_code = getattr(response, "status_code", None)
-                parsed_fields = (
-                    _parse_namecheap_fields(response.text) if response else {}
-                )
-                message = str(exc)
-                status = "error"
-                if parsed_fields or response_code is not None:
-                    message = _format_namecheap_message(
-                        message if not response else response.text,
-                        response_code,
-                        parsed_fields,
-                    )
-
-            log_db.log_update(
-                UpdateRecord(
-                    target_id=str(target.id),
-                    status=status,
-                    message=message,
-                    response_code=response_code,
-                    ip_address=ip_address,
-                )
-            )
-            results.append(
-                {
-                    "hostname": hostname,
-                    "status": status,
-                    "message": message,
-                    "parsed_fields": parsed_fields,
-                    "response_code": response_code,
-                }
-            )
+        payload = _force_update_target(
+            target,
+            ip_address=ip_address,
+            log_db=log_db,
+            secret_value=secret_value,
+            update_url_template=update_url_template,
+        )
     finally:
         log_db.close()
 
+    return jsonify(payload)
+
+
+@bp.post("/targets/force")
+def force_all_targets() -> Any:
+    targets = Target.query.filter_by(is_enabled=True).order_by(Target.id).all()
+    try:
+        crypto = _get_crypto()
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 400
+    try:
+        update_url_template = _get_update_url_template()
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 400
+    ip_address = _fetch_public_ip()
+    log_db = LogDB(current_app.config.get("AGENT_DB_PATH", "agent.db"))
+    results: list[dict[str, Any]] = []
+    try:
+        for target in targets:
+            secret_value = crypto.decrypt_str(target.secret.encrypted_value)
+            results.append(
+                _force_update_target(
+                    target,
+                    ip_address=ip_address,
+                    log_db=log_db,
+                    secret_value=secret_value,
+                    update_url_template=update_url_template,
+                )
+            )
+    finally:
+        log_db.close()
     return jsonify(
         {
-            "target_id": target.id,
             "ip_address": ip_address,
+            "target_count": len(targets),
             "results": results,
         }
     )

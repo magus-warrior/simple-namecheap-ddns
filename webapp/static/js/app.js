@@ -6,6 +6,7 @@ const SECRET_DRAWER = document.getElementById("secret-drawer");
 const TARGETS_TABLE = document.getElementById("targets-table");
 const TARGETS_LIST = document.getElementById("targets-list");
 const TARGET_ADD_HEADER = document.getElementById("target-add-header");
+const TARGETS_FORCE_ALL = document.getElementById("targets-force-all");
 
 const throwResponseError = async (response, fallbackMessage) => {
   let message = fallbackMessage;
@@ -107,6 +108,7 @@ const MANUAL_IP_ADDRESS = document.getElementById("manual-ip-address");
 const secretsCache = [];
 let editingSecretId = null;
 let editingTargetId = null;
+let targetsCache = [];
 
 const setStatus = (text, isError = false) => {
   STATUS_PILL.textContent = text;
@@ -228,6 +230,7 @@ const renderSecrets = (secrets, targets) => {
 };
 
 const renderTargets = (targets, secrets) => {
+  targetsCache = [...targets];
   clearTableRows(TARGETS_TABLE);
   TARGETS_LIST.innerHTML = "";
   if (!targets.length) {
@@ -616,6 +619,24 @@ const forceTargetUpdate = async (targetId) => {
   return payload;
 };
 
+const forceAllTargets = async () => {
+  const response = await fetch("/targets/force", { method: "POST" });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "Bulk update failed");
+  }
+  return payload;
+};
+
+const refreshLogs = async () => {
+  const response = await fetch("/dashboard");
+  if (!response.ok) {
+    throw new Error("Failed to refresh logs");
+  }
+  const logsPayload = await response.json();
+  renderLogs(logsPayload.logs ?? [], targetsCache);
+};
+
 const updateSettings = async () => {
   const payload = {
     manual_ip_enabled: MANUAL_IP_ENABLED.checked,
@@ -688,6 +709,34 @@ const loadData = async () => {
     setStatus("Agent log store unreachable • Last refresh —", true);
   }
 };
+
+TARGETS_FORCE_ALL?.addEventListener("click", async () => {
+  TARGETS_FORCE_ALL.disabled = true;
+  setStatus("Forcing updates for all enabled targets…");
+  try {
+    const payload = await forceAllTargets();
+    const targetResults = payload.results ?? [];
+    const hostResults = targetResults.flatMap((target) => target.results ?? []);
+    const successCount = hostResults.filter((result) => result.status === "success").length;
+    const errorCount = hostResults.filter((result) => result.status === "error").length;
+    const summaryParts = [];
+    if (successCount) {
+      summaryParts.push(`${successCount} OK`);
+    }
+    if (errorCount) {
+      summaryParts.push(`${errorCount} failed`);
+    }
+    if (!summaryParts.length) {
+      summaryParts.push("No updates sent");
+    }
+    setStatus(`Bulk update complete • ${summaryParts.join(" • ")}`);
+    await refreshLogs();
+  } catch (error) {
+    setStatus(error.message || "Bulk update failed", true);
+  } finally {
+    TARGETS_FORCE_ALL.disabled = false;
+  }
+});
 
 SECRET_FORM.addEventListener("submit", async (event) => {
   event.preventDefault();
