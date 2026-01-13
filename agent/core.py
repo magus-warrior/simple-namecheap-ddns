@@ -221,6 +221,15 @@ class DDNSRunner:
         config = self._get_config()
         if not config.targets:
             logging.info("No DDNS targets configured; skipping update cycle.")
+            self._db.log_update(
+                UpdateRecord(
+                    target_id="cycle",
+                    status="skipped",
+                    message="No DDNS targets configured; skipping update cycle.",
+                    response_code=None,
+                    ip_address=None,
+                )
+            )
             return
         current_ip: Optional[str]
         if config.manual_ip_enabled:
@@ -235,6 +244,18 @@ class DDNSRunner:
                 current_ip = self._fetch_public_ip(config)
         else:
             current_ip = self._fetch_public_ip(config)
+        if current_ip is None:
+            logging.warning("Failed to fetch public IP; skipping update cycle.")
+            self._db.log_update(
+                UpdateRecord(
+                    target_id="cycle",
+                    status="error",
+                    message="Failed to fetch public IP",
+                    response_code=None,
+                    ip_address=None,
+                )
+            )
+            return
         cached_ip = self._db.get_cache("last_ip")
         skip_unchanged_ip = current_ip and cached_ip == current_ip
         if skip_unchanged_ip:
@@ -250,6 +271,15 @@ class DDNSRunner:
                 target_cache_key = f"last_ip:{target.id}"
                 target_last_ip = self._db.get_cache(target_cache_key)
                 if target_last_ip == current_ip:
+                    self._db.log_update(
+                        UpdateRecord(
+                            target_id=target.id,
+                            status="skipped",
+                            message="IP unchanged; no update sent",
+                            response_code=None,
+                            ip_address=current_ip,
+                        )
+                    )
                     logging.info(
                         "Skipping %s; already updated for current IP.",
                         target.hostname,
