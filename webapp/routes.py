@@ -732,15 +732,21 @@ def dashboard() -> Any:
         return jsonify({"logs": rows})
     connection.row_factory = sqlite3.Row
     try:
-        cursor = connection.execute(
-            """
-            SELECT target_id, status, message, response_code, ip_address, created_at
-            FROM update_history
-            ORDER BY created_at DESC
-            LIMIT ?
-            """,
-            (limit,),
-        )
+        try:
+            cursor = connection.execute(
+                """
+                SELECT target_id, status, message, response_code, ip_address, created_at
+                FROM update_history
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+        except sqlite3.OperationalError:
+            current_app.logger.exception(
+                "Unable to query agent DB at %s", db_path
+            )
+            return jsonify({"logs": rows})
         for row in cursor.fetchall():
             rows.append({
                 "target_id": row["target_id"],
