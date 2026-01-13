@@ -109,6 +109,7 @@ const secretsCache = [];
 let editingSecretId = null;
 let editingTargetId = null;
 let targetsCache = [];
+const apiUrl = (path) => new URL(path.replace(/^\/+/, ""), window.location.href).toString();
 
 const setStatus = (text, isError = false) => {
   STATUS_PILL.textContent = text;
@@ -491,7 +492,7 @@ const createSecret = async () => {
     name: SECRET_NAME.value.trim(),
     value: SECRET_VALUE.value.trim(),
   };
-  const response = await fetch("/secrets", {
+  const response = await fetch(apiUrl("secrets"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -507,7 +508,7 @@ const createSecretFromTarget = async () => {
     name: TARGET_SECRET_NAME.value.trim(),
     value: TARGET_SECRET_VALUE.value.trim(),
   };
-  const response = await fetch("/secrets", {
+  const response = await fetch(apiUrl("secrets"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -529,7 +530,7 @@ const updateSecret = async (secretId) => {
   if (SECRET_VALUE.value.trim()) {
     payload.value = SECRET_VALUE.value.trim();
   }
-  const response = await fetch(`/secrets/${secretId}`, {
+  const response = await fetch(apiUrl(`secrets/${secretId}`), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -544,7 +545,7 @@ const deleteSecret = async (secretId) => {
   if (!confirm("Delete this secret? Targets using it will fail to update.")) {
     return;
   }
-  const response = await fetch(`/secrets/${secretId}`, { method: "DELETE" });
+  const response = await fetch(apiUrl(`secrets/${secretId}`), { method: "DELETE" });
   if (!response.ok) {
     setStatus("Failed to delete secret", true);
     return;
@@ -567,7 +568,7 @@ const createTarget = async () => {
     is_enabled: TARGET_ENABLED.checked,
     interval_minutes: Number(TARGET_INTERVAL.value),
   };
-  const response = await fetch("/targets", {
+  const response = await fetch(apiUrl("targets"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -586,7 +587,7 @@ const updateTarget = async (targetId) => {
     is_enabled: TARGET_ENABLED.checked,
     interval_minutes: Number(TARGET_INTERVAL.value),
   };
-  const response = await fetch(`/targets/${targetId}`, {
+  const response = await fetch(apiUrl(`targets/${targetId}`), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -598,7 +599,7 @@ const updateTarget = async (targetId) => {
 };
 
 const setTargetEnabled = async (target, isEnabled) => {
-  const response = await fetch(`/targets/${target.id}`, {
+  const response = await fetch(apiUrl(`targets/${target.id}`), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ is_enabled: isEnabled }),
@@ -611,7 +612,7 @@ const setTargetEnabled = async (target, isEnabled) => {
 };
 
 const forceTargetUpdate = async (targetId) => {
-  const response = await fetch(`/targets/${targetId}/force`, { method: "POST" });
+  const response = await fetch(apiUrl(`targets/${targetId}/force`), { method: "POST" });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(payload.error || "Force update failed");
@@ -620,7 +621,7 @@ const forceTargetUpdate = async (targetId) => {
 };
 
 const forceAllTargets = async () => {
-  const response = await fetch("/targets/force", { method: "POST" });
+  const response = await fetch(apiUrl("targets/force"), { method: "POST" });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(payload.error || "Bulk update failed");
@@ -629,7 +630,7 @@ const forceAllTargets = async () => {
 };
 
 const refreshLogs = async () => {
-  const response = await fetch("/dashboard");
+  const response = await fetch(apiUrl("dashboard"));
   if (!response.ok) {
     throw new Error("Failed to refresh logs");
   }
@@ -642,7 +643,7 @@ const updateSettings = async () => {
     manual_ip_enabled: MANUAL_IP_ENABLED.checked,
     manual_ip_address: MANUAL_IP_ADDRESS.value.trim() || null,
   };
-  const response = await fetch("/settings", {
+  const response = await fetch(apiUrl("settings"), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -661,7 +662,7 @@ const deleteTarget = async (targetId) => {
   if (!confirm("Delete this target?")) {
     return;
   }
-  const response = await fetch(`/targets/${targetId}`, { method: "DELETE" });
+  const response = await fetch(apiUrl(`targets/${targetId}`), { method: "DELETE" });
   if (!response.ok) {
     setStatus("Failed to delete target", true);
     return;
@@ -680,10 +681,10 @@ const loadData = async () => {
   try {
     setStatus("Syncing neon data streams…");
     const [secretsResponse, targetsResponse, logsResponse, settingsResponse] = await Promise.all([
-      fetch("/secrets"),
-      fetch("/targets"),
-      fetch("/dashboard"),
-      fetch("/settings"),
+      fetch(apiUrl("secrets")),
+      fetch(apiUrl("targets")),
+      fetch(apiUrl("dashboard")),
+      fetch(apiUrl("settings")),
     ]);
     if (
       !secretsResponse.ok ||
